@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habits</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* --- AESTHETIC CSS --- */
+        :root {
+            --bg: #f0f2f5; 
+            --surface: #ffffff; 
+            --text-main: #2d3436; 
+            --primary: #e84393; /* Hot Pink */
+            --border: #dfe6e9; 
+            --surface-transparent: rgba(255, 255, 255, 0.85);
+            --shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        [data-theme="dark"] {
+            --bg: #1e1e2e; 
+            --surface: #2d2d44; 
+            --text-main: #ecf0f1; 
+            --primary: #fd79a8; /* Lighter Pink */
+            --border: #40405c; 
+            --surface-transparent: rgba(45, 45, 68, 0.9);
+            --shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+        
+        * { box-sizing: border-box; transition: background 0.3s, color 0.3s; }
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            min-height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        /* Loading Screen */
+        #loader { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s; }
+        .spinner { width: 50px; height: 50px; border: 4px solid var(--border); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        /* Status Indicator (Bottom Left) */
+        #status-indicator { position: fixed; bottom: 20px; left: 20px; font-size: 0.8rem; opacity: 0.8; display: flex; align-items: center; gap: 8px; z-index: 100; background: var(--surface); padding: 8px 12px; border-radius: 20px; box-shadow: var(--shadow); }
+        .status-dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; }
+        .status-online { background: #00b894; box-shadow: 0 0 8px #00b894; }
+        .status-syncing { background: #fdcb6e; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        /* Main App Container */
+        .app-wrapper { width: 95%; max-width: 1600px; margin: 30px 0; height: 90vh; display: flex; flex-direction: column; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: -1px; }
+        
+        /* Table Styling */
+        .table-container { background: var(--surface-transparent); backdrop-filter: blur(20px); border-radius: 24px; flex-grow: 1; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; position: relative; box-shadow: var(--shadow); }
+        .scroll-area { overflow: auto; flex-grow: 1; scroll-behavior: smooth; }
+        
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); vertical-align: middle; }
+        
+        /* Sticky Logic */
+        thead { position: sticky; top: 0; z-index: 20; background: var(--surface); }
+        th:first-child, td:first-child { position: sticky; left: 0; z-index: 30; background: var(--surface); border-right: 3px solid var(--border); min-width: 220px; text-align: left; padding-left: 20px; }
+        thead th:first-child { z-index: 40; }
+
+        th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); opacity: 0.8; }
+        
+        .habit-label { font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .delete-btn { color: #ff7675; cursor: pointer; opacity: 0; transition: 0.2s; font-size: 1.2rem; }
+        tr:hover .delete-btn { opacity: 1; }
+
+        /* Checkboxes */
+        input[type="checkbox"] { appearance: none; width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--bg); transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); transform: scale(1.1); }
+        input[type="checkbox"]:checked::after { content: ''; display: block; width: 6px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); margin: 4px 0 0 7px; }
+        input[type="checkbox"]:hover { border-color: var(--primary); }
+
+        /* Progress Bar */
+        .progress-bar { height: 6px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #a29bfe); width: 0%; transition: width 0.8s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        /* Floating Action Button */
+        .fab { position: absolute; bottom: 30px; right: 30px; width: 56px; height: 56px; border-radius: 50%; background: var(--text-main); color: var(--bg); border: none; font-size: 28px; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 50; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; }
+        .fab:hover { transform: scale(1.1) rotate(90deg); }
+        
+        /* Header Controls */
+        .nav-controls { display: flex; gap: 10px; align-items: center; background: var(--surface); padding: 8px 20px; border-radius: 30px; box-shadow: var(--shadow); }
+        .nav-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-main); padding: 0 10px; transition: 0.2s; }
+        .nav-btn:hover { color: var(--primary); transform: scale(1.2); }
+        
+        .is-today { background-color: rgba(232,67,147,0.05); }
+        [data-theme="dark"] .is-today { background-color: rgba(232,67,147,0.15); }
+    </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loader"><div class="spinner"></div></div>
+
+<!-- Main App -->
+<div class="app-wrapper">
+    <header>
+        <h1>Habits</h1>
+        <div class="nav-controls">
+            <button class="nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+            <span id="monthDisplay" style="font-weight:700; min-width:160px; text-align:center; font-size: 1.1rem;">Loading...</span>
+            <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
+            <button class="nav-btn" onclick="toggleTheme()" title="Toggle Dark Mode" style="font-size:1.1rem; margin-left:15px; border-left: 1px solid var(--border); padding-left: 15px;">🌗</button>
+        </div>
+    </header>
+
+    <div class="table-container">
+        <div class="scroll-area">
+            <table id="trackerTable">
+                <thead><tr id="headerRow"></tr></thead>
+                <tbody id="habitBody"></tbody>
+            </table>
+        </div>
+        <button class="fab" onclick="addHabit()" title="Add New Habit">+</button>
+    </div>
+</div>
+
+<!-- Sync Status -->
+<div id="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Connecting...</span>
+</div>
+
+<script>
+    // ==========================================
+    // SUPABASE CONFIGURATION (Your Project)
+    // ==========================================
+    const SUPABASE_URL = 'https://czeebkyxfsgwxxsailkn.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZWVia3l4ZnNnd3h4c2FpbGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MjcxODAsImV4cCI6MjA3OTMwMzE4MH0.cFcEXDFmFiBAJErL8UIFpsNtGkjtpstwYdJSfI5Pepc';
+    // ==========================================
+
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Global State
+    let currentDate = new Date();
+    let habits = [];     
+    let history = {};    
+    let isFirstLoad = true;
+
+    // Init
+    window.onload = async () => {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        await loadFromCloud();
+        renderView();
+        
+        // Hide Loader
+        const loader = document.getElementById('loader');
+        loader.style.opacity = 0;
+        setTimeout(() => loader.style.display = 'none', 500);
+    };
+
+    // --- CLOUD SYNC ---
+    async function loadFromCloud() {
+        updateStatus('syncing');
+        try {
+            const { data, error } = await db.from('app_storage').select('data').eq('id', 1).single();
+            if (error) throw error;
+            
+            if (data && data.data) {
+                const cloudData = data.data;
+                habits = cloudData.habits && cloudData.habits.length > 0 ? cloudData.habits : [
+                    {id: 1, name: "Drink Water"}, 
+                    {id: 2, name: "Read 10 Mins"}
+                ];
+                history = cloudData.history || {};
+            }
+            updateStatus('online');
+        } catch (err) {
+            console.error("Load Error:", err);
+            updateStatus('error');
+            // Fallback if new DB
+            if(isFirstLoad) { habits = [{id: 1, name: "Add your first habit!"}]; isFirstLoad = false; }
+        }
+    }
+
+    async function saveToCloud() {
+        updateStatus('syncing');
+        const payload = { habits: habits, history: history };
+        try {
+            const { error } = await db.from('app_storage').update({ data: payload }).eq('id', 1);
+            if (error) throw error;
+            updateStatus('online');
+        } catch (err) {
+            console.error("Save Error:", err);
+            updateStatus('error');
+        }
+    }
+
+    // --- RENDER ---
+    function renderView() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        
+        document.getElementById('monthDisplay').innerText = 
+            currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+        const isCurrentMonth = today.getMonth() === month && today.getFullYear() === year;
+        const todayDate = today.getDate();
+
+        // Header
+        let headerHTML = '<th>HABIT</th>';
+        for(let i=1; i<=daysInMonth; i++) {
+            const dateObj = new Date(year, month, i);
+            const dayName = dateObj.toLocaleDateString('en-US', {weekday:'narrow'});
+            const isTodayClass = (isCurrentMonth && i === todayDate) ? 'is-today' : '';
+            
+            headerHTML += `<th class="${isTodayClass}">
+                <div style="font-size:1.1em; color:var(--text-main)">${i}</div>
+                <small style="font-weight:400; opacity:0.6">${dayName}</small>
+            </th>`;
+        }
+        headerHTML += '<th style="min-width:80px">STATS</th>';
+        document.getElementById('headerRow').innerHTML = headerHTML;
+
+        // Body
+        const tbody = document.getElementById('habitBody');
+        tbody.innerHTML = '';
+
+        habits.forEach((habit, index) => {
+            let rowHTML = `<td>
+                <div class="habit-label">
+                    ${habit.name} 
+                    <span class="delete-btn" onclick="deleteHabit(${index})">&times;</span>
+                </div>
+            </td>`;
+            
+            let checkCount = 0;
+
+            for(let i=1; i<=daysInMonth; i++) {
+                const dateKey = `${habit.id}_${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                const isChecked = history[dateKey] ? 'checked' : '';
+                const isTodayClass = (isCurrentMonth && i === todayDate) ? 'is-today' : '';
+                
+                if(isChecked) checkCount++;
+
+                rowHTML += `<td class="${isTodayClass}">
+                    <input type="checkbox" ${isChecked} onchange="toggleCheck('${dateKey}')">
+                </td>`;
+            }
+
+            const percent = Math.round((checkCount/daysInMonth)*100);
+            rowHTML += `<td>
+                <div style="font-weight:bold; font-size:0.8rem; color:var(--primary)">${percent}%</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+            </td>`;
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = rowHTML;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- LOGIC ---
+    function toggleCheck(key) {
+        if(history[key]) delete history[key];
+        else history[key] = true;
+        renderView(); 
+        debounceSave(); 
+    }
+
+    function addHabit() {
+        const name = prompt("What is your new habit?");
+        if(name) {
+            habits.push({ id: Date.now(), name: name });
+            renderView();
+            saveToCloud();
+        }
+    }
+
+    function deleteHabit(index) {
+        if(confirm("Delete this habit?")) {
+            habits.splice(index, 1);
+            renderView();
+            saveToCloud();
+        }
+    }
+
+    function changeMonth(dir) {
+        currentDate.setMonth(currentDate.getMonth() + dir);
+        renderView();
+    }
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    }
+
+    let timeout;
+    function debounceSave() {
+        clearTimeout(timeout);
+        updateStatus('syncing');
+        timeout = setTimeout(saveToCloud, 1500); 
+    }
+
+    function updateStatus(state) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        dot.className = 'status-dot';
+        
+        if(state === 'online') {
+            dot.classList.add('status-online');
+            text.innerText = "Synced";
+        } else if (state === 'syncing') {
+            dot.classList.add('status-syncing');
+            text.innerText = "Saving...";
+        } else {
+            dot.style.background = 'red';
+            text.innerText = "Database Error";
+        }
+    }
+</script>
+
+</body>
+</html>
