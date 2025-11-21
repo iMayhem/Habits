@@ -7,7 +7,7 @@
     --success: #8bc34a;
 }
 
-* { box-sizing: border-box; -webkit-font-smoothing: antialiased; outline: none; }
+* { box-sizing: border-box; outline: none; }
 
 body {
     font-family: 'Poppins', sans-serif;
@@ -23,10 +23,10 @@ body {
 /* App Container */
 .app-container {
     width: 95%; max-width: 1400px; margin-top: 40px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
     border-radius: 24px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
     padding: 30px;
     border: 1px solid white;
     position: relative;
@@ -56,24 +56,59 @@ button {
     font-family: inherit; background: white; cursor: pointer;
 }
 
-/* Table */
-.table-wrapper { overflow-x: auto; border-radius: 16px; border: 1px solid var(--border); background: white; }
-table { width: 100%; border-collapse: collapse; min-width: 1000px; }
-
-th, td { padding: 15px; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; }
-th:first-child, td:first-child {
-    position: sticky; left: 0; background: white; z-index: 10;
-    border-right: 2px solid var(--border); min-width: 260px;
-    text-align: left; padding-left: 25px;
+/* TABLE FIXES FOR STICKY COLUMNS */
+.table-wrapper { 
+    overflow-x: auto; 
+    border-radius: 16px; 
+    border: 1px solid var(--border); 
+    background: white; 
+    position: relative;
 }
-th { background: #fffcfd; font-weight: 600; font-size: 0.85rem; color: #888; letter-spacing: 0.5px; }
 
-/* Habits */
-.habit-row:hover .habit-text { color: var(--primary-dark); }
-.habit-text { font-weight: 500; cursor: pointer; }
-.mini-btn { background: none; border: none; color: #aaa; font-size: 1.2rem; cursor: pointer; opacity: 0; transition: 0.2s; margin-left: 10px; }
-tr:hover .mini-btn { opacity: 1; }
-.mini-btn:hover { color: #ff6b6b; transform: scale(1.2); }
+table { 
+    width: 100%; 
+    border-collapse: separate; /* Critical for sticky to work */
+    border-spacing: 0; 
+    min-width: 1000px; 
+}
+
+th, td { 
+    padding: 15px; 
+    text-align: center; 
+    border-bottom: 1px solid var(--border); 
+    vertical-align: middle; 
+    background: white;
+}
+
+/* Sticky First Column Configuration */
+th:first-child, td:first-child {
+    position: sticky; 
+    left: 0; 
+    z-index: 20;
+    border-right: 2px solid var(--border); 
+    min-width: 260px;
+    text-align: left; 
+    padding-left: 25px;
+    background: white; /* Ensure it's opaque */
+}
+
+/* Header Specifics */
+th { background: #fffcfd; font-weight: 600; font-size: 0.85rem; color: #888; letter-spacing: 0.5px; z-index: 10; }
+/* Corner cell needs higher z-index */
+th:first-child { z-index: 30; background: #fffcfd; } 
+
+/* Footer Specifics */
+.footer-row td { 
+    background: #fffcfd; 
+    font-weight: bold; 
+    border-top: 2px solid var(--border); 
+    height: 70px; 
+}
+/* Footer Sticky Cell */
+.footer-row td:first-child {
+    z-index: 30;
+    background: #fffcfd; /* Ensure it covers scrolling content */
+}
 
 /* Checkboxes */
 input[type="checkbox"] {
@@ -86,10 +121,8 @@ input[type="checkbox"]:checked::after {
     content: '✓'; position: absolute; color: white; font-size: 14px;
     left: 50%; top: 50%; transform: translate(-50%, -50%);
 }
-input[type="checkbox"]:disabled { opacity: 0.5; cursor: not-allowed; background: #f5f5f5; }
 
-/* Footer Stats */
-.footer-row td { background: #fffcfd; font-weight: bold; border-top: 2px solid var(--border); height: 70px; }
+/* Circle Chart */
 .circle-chart {
     width: 35px; height: 35px; border-radius: 50%;
     background: conic-gradient(var(--primary) var(--p, 0%), #eee 0%);
@@ -114,5 +147,5 @@ input[type="checkbox"]:disabled { opacity: 0.5; cursor: not-allowed; background:
 .modal-overlay.active .modal { transform: translateY(0); }
 .input-field { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin: 15px 0; font-family: inherit; }
 
-/* Auth */
+/* Auth Box */
 .auth-box { width: 100%; max-width: 380px; margin-top: 10vh; background: white; padding: 40px; border-radius: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
