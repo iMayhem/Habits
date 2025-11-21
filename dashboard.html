@@ -11,7 +11,7 @@
 </head>
 <body>
 
-<!-- Sync Status Icon -->
+<!-- Sync Status (Bottom Left) -->
 <div id="syncStatus" class="sync-status">
     <div id="syncDot" class="sync-dot"></div>
     <span id="syncText">Saved</span>
@@ -76,9 +76,8 @@
     let viewingUserId = null;
     let canEdit = true;
     let dateCursor = new Date();
-    let currentListTitle = "HABIT"; // Default
+    let currentListTitle = "HABIT";
 
-    // 1. STARTUP
     window.onload = async () => {
         const { data: { session } } = await db.auth.getSession();
         if (!session) { window.location.href = 'index.html'; return; }
@@ -95,35 +94,66 @@
         window.location.href = 'index.html';
     }
 
-    // 2. MAIN RENDER LOOP
     async function render() {
-        setSync('saving'); // Show spinner
+        setSync('saving');
         const year = dateCursor.getFullYear();
         const month = dateCursor.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         
         document.getElementById('dateDisplay').innerText = dateCursor.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // A. Fetch List Title (Profile Settings)
+        // A. Get List Title
         const { data: profile } = await db.from('profiles').select('list_title').eq('id', viewingUserId).single();
         currentListTitle = profile ? profile.list_title : "HABIT";
         
-        // B. Fetch Habits & Logs
+        // B. Get Habits
         const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
-        const { data: logs } = await db.from('habit_logs').select('*')
-            .gte('log_date', `${year}-${month+1}-01`)
-            .lte('log_date', `${year}-${month+1}-${daysInMonth}`);
 
-        // C. Render Header
+        // C. Get Logs (Specific Fix for Friends)
+        let logs = [];
+        if (habits && habits.length > 0) {
+            const habitIds = habits.map(h => h.id);
+            const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
+            const endStr = `${year}-${String(month+1).padStart(2,'0')}-${daysInMonth}`;
+            const { data: logData } = await db.from('habit_logs')
+                .select('*')
+                .in('habit_id', habitIds)
+                .gte('log_date', startStr)
+                .lte('log_date', endStr);
+            logs = logData || [];
+        }
+
         renderHeader(daysInMonth, year, month);
+        renderBody(habits || [], logs, daysInMonth, year, month);
+        renderFooter(daysInMonth, year, month, habits || [], logs);
+        setSync('saved');
+    }
 
-        // D. Render Body
+    function renderHeader(daysInMonth, year, month) {
+        const isMe = (viewingUserId === currentUser.id);
+        const action = isMe ? `onclick="openModal('listTitle', null, '${currentListTitle}')"` : '';
+        const cls = isMe ? 'editable-header' : '';
+        const hint = isMe ? '<span style="font-size:0.6rem; color:#aaa; font-weight:normal; margin-left:5px;">✎</span>' : '';
+
+        let html = `<th><span class="${cls}" ${action}>${currentListTitle}</span>${hint}</th>`;
+        
+        const today = new Date();
+        for(let i=1; i<=daysInMonth; i++) {
+            const d = new Date(year, month, i);
+            const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
+            const isToday = (d.toDateString() === today.toDateString()) ? 'background:#fff0f5; color:#c58a9f;' : '';
+            html += `<th style="${isToday}"><div>${i}</div><small>${dayName}</small></th>`;
+        }
+        document.getElementById('headerRow').innerHTML = html;
+    }
+
+    function renderBody(habits, logs, daysInMonth, year, month) {
         const tbody = document.getElementById('habitBody');
         tbody.innerHTML = '';
         const isMe = (viewingUserId === currentUser.id);
 
-        if(!habits || habits.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:#999;">No habits found. Add one to start!</td></tr>`;
+        if(habits.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:#999;">No habits found.</td></tr>`;
         } else {
             habits.forEach(h => {
                 let row = `<tr class="habit-row"><td>
@@ -137,80 +167,40 @@
                     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                     const isChecked = logs.find(l => l.habit_id === h.id && l.log_date === dateStr && l.completed);
                     const disabled = (!isMe && !canEdit) ? 'disabled' : '';
-                    
                     row += `<td><input type="checkbox" ${isChecked ? 'checked' : ''} ${disabled} 
                             onchange="toggleCheck(${h.id}, '${dateStr}', this.checked)"></td>`;
                 }
                 tbody.innerHTML += row + '</tr>';
             });
         }
-
-        // E. Render Footer
-        renderFooter(daysInMonth, year, month, habits, logs);
-        setSync('saved');
-    }
-
-    function renderHeader(daysInMonth, year, month) {
-        const isMe = (viewingUserId === currentUser.id);
-        // Determine if we can edit the header
-        const headerClickAction = isMe ? `onclick="openModal('listTitle', null, '${currentListTitle}')"` : '';
-        const headerClass = isMe ? 'editable-header' : '';
-        const editHint = isMe ? '<span style="font-size:0.6rem; color:#aaa; font-weight:normal; margin-left:5px;">✎</span>' : '';
-
-        let headerHtml = `<th>
-            <span class="${headerClass}" ${headerClickAction}>${currentListTitle}</span>${editHint}
-        </th>`;
-        
-        const today = new Date();
-        for(let i=1; i<=daysInMonth; i++) {
-            const d = new Date(year, month, i);
-            const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
-            const isToday = (d.toDateString() === today.toDateString()) ? 'background:#fff0f5; color:#c58a9f;' : '';
-            headerHtml += `<th style="${isToday}"><div>${i}</div><small>${dayName}</small></th>`;
-        }
-        document.getElementById('headerRow').innerHTML = headerHtml;
     }
 
     function renderFooter(daysInMonth, year, month, habits, logs) {
         let footerHtml = '<td>Daily Progress</td>';
         for(let i=1; i<=daysInMonth; i++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-            let total = habits ? habits.length : 0;
+            let total = habits.length;
             let done = 0;
-            if(total > 0 && logs) {
-                done = logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length;
-            }
+            if(total > 0) done = logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length;
             let percent = total === 0 ? 0 : Math.round((done/total)*100);
             
-            footerHtml += `<td>
-                <div class="circle-chart" style="--p: ${percent}%">
-                    <span class="circle-text">${percent}%</span>
-                </div>
-            </td>`;
+            footerHtml += `<td><div class="circle-chart" style="--p: ${percent}%"><span class="circle-text">${percent}%</span></div></td>`;
         }
         document.getElementById('footerRow').innerHTML = footerHtml;
     }
 
-    // 3. ACTIONS & SYNC
+    // ACTIONS
     function setSync(status) {
         const box = document.getElementById('syncStatus');
         const dot = document.getElementById('syncDot');
         const txt = document.getElementById('syncText');
-        
         box.classList.add('visible');
-        dot.className = 'sync-dot';
-        
-        if(status === 'saving') {
-            dot.classList.add('saving');
-            txt.innerText = "Syncing...";
-        } else if (status === 'saved') {
-            dot.classList.add('saved');
+        dot.className = 'sync-dot ' + status;
+        if(status === 'saving') txt.innerText = "Syncing...";
+        else if (status === 'saved') {
             txt.innerText = "Saved";
             setTimeout(() => box.classList.remove('visible'), 2000);
-        } else {
-            dot.classList.add('error');
-            txt.innerText = "Error";
-        }
+        } else txt.innerText = "Error";
     }
 
     async function toggleCheck(habitId, dateStr, checked) {
@@ -229,13 +219,9 @@
     }
 
     async function loadFriends() {
-        const { data } = await db.from('profile_access')
-            .select('owner_id, can_edit, profiles:owner_id(email)')
-            .eq('viewer_id', currentUser.id);
-            
+        const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(email)').eq('viewer_id', currentUser.id);
         const sel = document.getElementById('viewSelector');
         sel.innerHTML = '<option value="me">My Habits</option>';
-        
         if(data) {
             data.forEach(row => {
                 const opt = document.createElement('option');
@@ -266,7 +252,7 @@
         render();
     }
 
-    // 4. MODALS
+    // MODALS
     let mType = '', mId = null;
     function openModal(type, id=null, txt='') {
         mType = type; mId = id;
@@ -274,7 +260,6 @@
         const title = document.getElementById('modalTitle');
         const input = document.getElementById('modalInput');
         const friendOpts = document.getElementById('friendOptions');
-        
         overlay.classList.add('active');
         input.value = txt;
         friendOpts.style.display = 'none';
@@ -282,11 +267,7 @@
         if(type === 'habit') { title.innerText = "New Habit"; input.placeholder = "Ex: Read 10 mins"; }
         else if (type === 'rename') { title.innerText = "Rename"; }
         else if (type === 'listTitle') { title.innerText = "List Name"; input.placeholder = "Ex: My Morning Routine"; }
-        else if (type === 'friend') { 
-            title.innerText = "Share with Friend"; 
-            input.placeholder = "friend@email.com";
-            friendOpts.style.display = 'block';
-        }
+        else if (type === 'friend') { title.innerText = "Share with Friend"; input.placeholder = "friend@email.com"; friendOpts.style.display = 'block'; }
         input.focus();
     }
 
@@ -295,39 +276,18 @@
     document.getElementById('modalConfirmBtn').onclick = async () => {
         const val = document.getElementById('modalInput').value;
         if(!val) return;
-        
-        document.getElementById('modalConfirmBtn').innerText = "Saving...";
         setSync('saving');
-
         try {
-            if(mType === 'habit') {
-                await db.from('habits').insert({ user_id: currentUser.id, title: val });
-            } 
-            else if (mType === 'rename') {
-                await db.from('habits').update({ title: val }).eq('id', mId);
-            }
-            else if (mType === 'listTitle') {
-                await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
-            }
+            if(mType === 'habit') await db.from('habits').insert({ user_id: currentUser.id, title: val });
+            else if (mType === 'rename') await db.from('habits').update({ title: val }).eq('id', mId);
+            else if (mType === 'listTitle') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
             else if (mType === 'friend') {
-                const { data: friend } = await db.from('profiles').select('id').eq('email', val).single();
-                if(!friend) { alert("User not found!"); }
-                else {
-                    const canEdit = document.getElementById('canEditCheck').checked;
-                    const { error } = await db.from('profile_access').insert({
-                        owner_id: currentUser.id, viewer_id: friend.id, can_edit: canEdit
-                    });
-                    if(error) alert("Already added or error.");
-                    else alert("Shared!");
-                }
+                const { data: f } = await db.from('profiles').select('id').eq('email', val).single();
+                if(!f) alert("User not found!");
+                else await db.from('profile_access').insert({ owner_id: currentUser.id, viewer_id: f.id, can_edit: document.getElementById('canEditCheck').checked });
             }
-            closeModal();
-            render();
-        } catch(e) {
-            alert("Error: " + e.message);
-            setSync('error');
-        }
-        document.getElementById('modalConfirmBtn').innerText = "Confirm";
+            closeModal(); render();
+        } catch(e) { alert("Error: " + e.message); setSync('error'); }
     };
 </script>
 </body>

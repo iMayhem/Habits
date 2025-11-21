@@ -6,11 +6,10 @@
     --bg: #fcfcfc;
     --border: #f0f0f0;
     --success: #8bc34a;
-    --error: #e74c3c;
     --white: #ffffff;
 }
 
-/* --- GLOBAL RESET --- */
+/* --- RESET --- */
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
 
 body {
@@ -24,28 +23,29 @@ body {
     display: flex; flex-direction: column; align-items: center;
 }
 
-/* --- SYNC INDICATOR (Top Left) --- */
+/* --- SYNC INDICATOR (Bottom Left) --- */
 .sync-status {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     left: 20px;
     display: flex;
     align-items: center;
     gap: 8px;
     background: white;
-    padding: 8px 12px;
-    border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 8px 14px;
+    border-radius: 30px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     font-size: 0.75rem;
     font-weight: 600;
     color: #666;
-    z-index: 3000; /* Highest layer */
+    z-index: 3000;
     border: 1px solid #eee;
     transition: 0.3s;
-    opacity: 0; /* Hidden by default */
+    opacity: 0; 
     pointer-events: none;
+    transform: translateY(10px);
 }
-.sync-status.visible { opacity: 1; }
+.sync-status.visible { opacity: 1; transform: translateY(0); }
 
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
 .sync-dot.saving { background: #f1c40f; animation: pulse 1s infinite; }
@@ -54,7 +54,7 @@ body {
 
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* --- MAIN CONTAINER --- */
+/* --- CONTAINER --- */
 .app-container {
     width: 95%; max-width: 1400px; margin-top: 40px;
     background: rgba(255, 255, 255, 0.95);
@@ -68,14 +68,9 @@ body {
 }
 
 /* --- HEADER --- */
-header { 
-    display: flex; justify-content: space-between; align-items: center; 
-    margin-bottom: 30px; flex-wrap: wrap; gap: 20px; 
-}
-
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
 h1 { font-size: 1.8rem; font-weight: 600; color: #333; margin: 0; }
 .subtitle { color: #888; font-size: 0.9rem; margin-top: 5px; }
-
 .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* --- BUTTONS --- */
@@ -90,100 +85,46 @@ button {
 .btn-secondary:hover { background: #f5f5f5; }
 
 /* --- DROPDOWN --- */
-.view-select {
-    padding: 10px; border-radius: 12px; border: 1px solid #ddd;
-    font-family: inherit; background: white; cursor: pointer;
-}
+.view-select { padding: 10px; border-radius: 12px; border: 1px solid #ddd; font-family: inherit; background: white; cursor: pointer; }
 
-/* --- TABLE WRAPPER & STICKY LOGIC --- */
+/* --- TABLE & STICKY --- */
 .table-wrapper { 
-    overflow-x: auto; 
-    border-radius: 16px; 
-    border: 1px solid var(--border); 
-    background: white; 
-    position: relative;
-    max-height: 70vh; /* Prevents super long pages */
+    overflow-x: auto; border-radius: 16px; 
+    border: 1px solid var(--border); background: white; 
+    position: relative; max-height: 75vh;
 }
+table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1000px; }
+th, td { padding: 15px; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; background: white; }
 
-table { 
-    width: 100%; 
-    border-collapse: separate; /* REQUIRED for sticky headers */
-    border-spacing: 0; 
-    min-width: 1000px; 
-}
-
-th, td { 
-    padding: 15px; 
-    text-align: center; 
-    border-bottom: 1px solid var(--border); 
-    vertical-align: middle; 
-    background: white;
-}
-
-/* Sticky First Column (Habit Names) */
+/* Sticky First Column */
 th:first-child, td:first-child {
-    position: sticky; 
-    left: 0; 
-    z-index: 20;
-    border-right: 2px solid var(--border); 
-    min-width: 260px;
-    text-align: left; 
-    padding-left: 25px;
-    background: white;
+    position: sticky; left: 0; z-index: 20;
+    border-right: 2px solid var(--border); min-width: 260px;
+    text-align: left; padding-left: 25px; background: white;
 }
 
-/* Sticky Header Row */
+/* Sticky Header */
 thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: #fffcfd;
-    font-weight: 600; 
-    font-size: 0.85rem; 
-    color: #888; 
-    letter-spacing: 0.5px;
+    position: sticky; top: 0; z-index: 10;
+    background: #fffcfd; font-weight: 600; font-size: 0.85rem; color: #888; letter-spacing: 0.5px;
     border-bottom: 1px solid var(--border);
 }
+thead th:first-child { z-index: 30; background: #fffcfd; }
 
-/* The Top-Left Corner Cell (Needs highest z-index) */
-thead th:first-child { 
-    z-index: 30; 
-    background: #fffcfd; 
-}
+/* Footer */
+.footer-row td { background: #fffcfd; font-weight: bold; border-top: 2px solid var(--border); height: 70px; }
+.footer-row td:first-child { position: sticky; left: 0; z-index: 30; background: #fffcfd; border-right: 2px solid var(--border); }
 
-/* Footer Row */
-.footer-row td { 
-    background: #fffcfd; 
-    font-weight: bold; 
-    border-top: 2px solid var(--border); 
-    height: 70px; 
-}
-
-/* Sticky Footer First Cell */
-.footer-row td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 30;
-    background: #fffcfd;
-    border-right: 2px solid var(--border);
-}
-
-/* --- HABIT TEXT --- */
+/* --- HABIT TEXT & EDITABLE HEADER --- */
 .habit-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
 .habit-text { font-weight: 500; cursor: pointer; transition: 0.2s; width: 100%; }
 .habit-row:hover .habit-text { color: var(--primary-dark); }
 
 .editable-header {
-    cursor: pointer;
-    border-bottom: 1px dashed #ccc;
-    display: inline-block;
-    transition: 0.2s;
-    padding-bottom: 2px;
+    cursor: pointer; border-bottom: 1px dashed #ccc;
+    display: inline-block; transition: 0.2s; padding-bottom: 2px;
 }
-.editable-header:hover {
-    color: var(--primary-dark);
-    border-bottom: 1px dashed var(--primary);
-}
+.editable-header:hover { color: var(--primary-dark); border-bottom: 1px dashed var(--primary); }
 
 .mini-btn { 
     background: none; border: none; color: #aaa; 
@@ -199,34 +140,21 @@ input[type="checkbox"] {
     border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer;
     transition: 0.2s; position: relative; background: white;
 }
-input[type="checkbox"]:checked { 
-    background-color: var(--primary); 
-    border-color: var(--primary); 
-    transform: scale(1.1); 
-}
+input[type="checkbox"]:checked { background-color: var(--primary); border-color: var(--primary); transform: scale(1.1); }
 input[type="checkbox"]:checked::after {
     content: '✓'; position: absolute; color: white; font-size: 14px;
     left: 50%; top: 50%; transform: translate(-50%, -50%);
 }
-input[type="checkbox"]:disabled { 
-    opacity: 0.5; cursor: not-allowed; background: #f9f9f9; 
-}
+input[type="checkbox"]:disabled { opacity: 0.5; cursor: not-allowed; background: #f9f9f9; }
 
-/* --- CIRCLE CHART (Progress) --- */
+/* --- CIRCLE CHART --- */
 .circle-chart {
     width: 35px; height: 35px; border-radius: 50%;
     background: conic-gradient(var(--primary) var(--p, 0%), #eee 0%);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto;
 }
-.circle-chart::after { 
-    content: ''; width: 27px; height: 27px; 
-    background: white; border-radius: 50%; position: absolute; 
-}
-.circle-text { 
-    position: relative; z-index: 2; 
-    font-size: 0.65rem; color: #555; font-weight: 600; 
-}
+.circle-chart::after { content: ''; width: 27px; height: 27px; background: white; border-radius: 50%; position: absolute; }
+.circle-text { position: relative; z-index: 2; font-size: 0.65rem; color: #555; font-weight: 600; }
 
 /* --- MODAL --- */
 .modal-overlay {
@@ -236,33 +164,13 @@ input[type="checkbox"]:disabled {
     z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s;
 }
 .modal-overlay.active { opacity: 1; pointer-events: all; }
-
 .modal {
-    background: white; width: 90%; max-width: 400px; 
-    padding: 30px; border-radius: 20px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.15); 
+    background: white; width: 90%; max-width: 400px; padding: 30px; 
+    border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); 
     transform: translateY(20px); transition: 0.3s;
 }
 .modal-overlay.active .modal { transform: translateY(0); }
-
-.modal h2 { margin-top: 0; color: var(--text); }
-
-.input-field { 
-    width: 100%; padding: 12px; border: 1px solid #ddd; 
-    border-radius: 8px; margin: 15px 0; font-family: inherit; 
-}
+.input-field { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin: 15px 0; font-family: inherit; }
 
 /* --- AUTH PAGE --- */
-.auth-box { 
-    width: 90%; max-width: 380px; margin-top: 10vh; 
-    background: white; padding: 40px; border-radius: 24px; 
-    text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05); 
-}
-
-/* --- MOBILE RESPONSIVE --- */
-@media (max-width: 768px) {
-    .app-container { padding: 15px; width: 100%; margin-top: 0; border: none; }
-    th:first-child, td:first-child { min-width: 160px; padding-left: 15px; }
-    .controls { gap: 5px; }
-    button { padding: 8px 12px; font-size: 0.8rem; }
-}
+.auth-box { width: 90%; max-width: 380px; margin-top: 10vh; background: white; padding: 40px; border-radius: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
