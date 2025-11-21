@@ -27,10 +27,10 @@
                 <option value="me">My Habits</option>
             </select>
             
-            <!-- Friend Manager Button -->
+            <!-- Friend Manager -->
             <button class="btn-secondary" onclick="openModal('friendsList')" title="Manage Friends">👥</button>
             
-            <!-- Settings (Username) -->
+            <!-- Settings -->
             <button class="btn-icon-only" onclick="openModal('settings')" title="Settings">⚙️</button>
 
             <div style="border-left:1px solid var(--border); height:20px; margin:0 5px;"></div>
@@ -97,18 +97,21 @@
         render();
     };
 
-    // --- 1. LOGIC: USERNAME & RENDER ---
+    // --- 1. LOGIC: USERNAME CHECK ---
     async function checkUsernameSetup() {
         const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
         if (data) {
             myUsername = data.username;
-            if (myUsername.includes('@') || myUsername.includes('_0.')) {
-                openModal('username', null, myUsername);
+            // Check for temp username (e.g., temp_user_12345)
+            if (myUsername.startsWith('temp_user_')) {
+                openModal('username', null, '');
                 document.getElementById('mainModal').classList.add('locked');
+                document.getElementById('modalDesc').innerText = "Welcome! Please choose a unique username to continue.";
             }
         }
     }
 
+    // --- 2. RENDER ENGINE ---
     async function render() {
         setSync('saving');
         const year = dateCursor.getFullYear();
@@ -121,6 +124,7 @@
         
         const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
 
+        // Fetch Logs (Correctly filtering for viewed user)
         let logs = [];
         if (habits && habits.length > 0) {
             const habitIds = habits.map(h => h.id);
@@ -160,7 +164,7 @@
         const isMe = (viewingUserId === currentUser.id);
 
         if(habits.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:var(--text-sub);">No habits found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:var(--text-sub);">No habits yet.</td></tr>`;
         } else {
             habits.forEach(h => {
                 let row = `<tr class="habit-row"><td>
@@ -194,13 +198,14 @@
         document.getElementById('footerRow').innerHTML = footerHtml;
     }
 
-    // --- 2. ACTIONS ---
+    // --- 3. ACTIONS ---
     function setSync(status) {
         const box = document.getElementById('syncStatus');
         const dot = document.getElementById('syncDot');
+        const txt = document.getElementById('syncText');
         box.classList.add('visible');
         dot.className = 'sync-dot ' + status;
-        document.getElementById('syncText').innerText = status === 'saving' ? "Syncing..." : status === 'saved' ? "Saved" : "Error";
+        txt.innerText = status === 'saving' ? "Syncing..." : status === 'saved' ? "Saved" : "Error";
         if(status === 'saved') setTimeout(() => box.classList.remove('visible'), 2000);
     }
 
@@ -212,7 +217,7 @@
     }
 
     async function deleteHabit(id) {
-        if(confirm("Delete?")) {
+        if(confirm("Delete habit?")) {
             setSync('saving');
             await db.from('habits').delete().eq('id', id);
             render();
@@ -234,6 +239,7 @@
         }
     }
 
+    // --- FRIEND MANAGER LOGIC ---
     async function renderFriendsList() {
         const { data } = await db.from('profile_access').select('id, viewer_id, can_edit, profiles:viewer_id(username)').eq('owner_id', currentUser.id);
         const container = document.getElementById('modalContent');
@@ -278,7 +284,7 @@
         renderFriendsList();
     }
     async function removeFriend(accessId) {
-        if(confirm("Remove?")) { await db.from('profile_access').delete().eq('id', accessId); renderFriendsList(); }
+        if(confirm("Remove friend?")) { await db.from('profile_access').delete().eq('id', accessId); renderFriendsList(); }
     }
 
     function switchView() {
@@ -286,7 +292,9 @@
         if(sel.value === 'me') {
             viewingUserId = currentUser.id; canEdit = true; document.getElementById('addHabitBtn').style.display = 'block';
         } else {
-            viewingUserId = sel.value; canEdit = (sel.options[sel.selectedIndex].dataset.edit === 'true'); document.getElementById('addHabitBtn').style.display = 'none';
+            viewingUserId = sel.value;
+            canEdit = (sel.options[sel.selectedIndex].dataset.edit === 'true');
+            document.getElementById('addHabitBtn').style.display = 'none';
         }
         render();
     }
@@ -298,7 +306,7 @@
     }
     async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
 
-    // --- 3. MODALS ---
+    // --- MODALS ---
     let mType = '', mId = null;
     function openModal(type, id=null, txt='') {
         mType = type; mId = id;
@@ -315,16 +323,10 @@
             content.innerHTML = `<input type="text" id="modalInput" class="input-field" placeholder="Ex: Read 10 mins">`;
             setTimeout(() => document.getElementById('modalInput').focus(), 100);
         } 
-        else if (type === 'rename') {
-            title.innerText = "Rename"; desc.innerText = "";
-            content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`;
-        }
-        else if (type === 'listTitle') {
-            title.innerText = "List Name"; desc.innerText = "";
-            content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`;
-        }
+        else if (type === 'rename') { title.innerText = "Rename"; desc.innerText = ""; content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`; }
+        else if (type === 'listTitle') { title.innerText = "List Name"; desc.innerText = ""; content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`; }
         else if (type === 'settings' || type === 'username') {
-            title.innerText = "Pick a Username"; desc.innerText = "This is how friends will find you.";
+            title.innerText = "Pick a Username"; desc.innerText = "Unique name for friends to find you.";
             content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt || myUsername}" placeholder="username"><div id="inputError" class="input-error-text">Username taken!</div>`;
             if(type === 'username') actions.querySelector('.modal-close').style.display = 'none';
         }

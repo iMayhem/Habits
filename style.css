@@ -43,7 +43,7 @@ body {
     display: flex; flex-direction: column; align-items: center;
 }
 
-/* --- SYNC INDICATOR (Bottom Left) --- */
+/* --- SYNC INDICATOR --- */
 .sync-status {
     position: fixed; bottom: 20px; left: 20px;
     display: flex; align-items: center; gap: 8px;
@@ -91,7 +91,7 @@ button {
     font-family: inherit; background: var(--bg-surface); color: var(--text-main); cursor: pointer;
 }
 
-/* --- TABLE & STICKY --- */
+/* --- TABLE --- */
 .table-wrapper { overflow-x: auto; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-surface); position: relative; max-height: 75vh; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1000px; }
 th, td { padding: 15px; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; background: var(--bg-surface); }
@@ -114,7 +114,7 @@ thead th:first-child { z-index: 30; background: var(--header-bg); }
 .footer-row td { background: var(--header-bg); font-weight: bold; border-top: 2px solid var(--border); height: 70px; }
 .footer-row td:first-child { position: sticky; left: 0; z-index: 30; background: var(--header-bg); border-right: 2px solid var(--border); }
 
-/* --- HABIT TEXT & EDITABLE HEADER --- */
+/* --- HABIT TEXT --- */
 .habit-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
 .habit-text { font-weight: 500; cursor: pointer; width: 100%; color: var(--text-main); }
 .habit-row:hover .habit-text { color: var(--primary); }
@@ -137,7 +137,7 @@ input[type="checkbox"]:checked::after {
     content: '✓'; position: absolute; color: white; font-size: 14px;
     left: 50%; top: 50%; transform: translate(-50%, -50%);
 }
-/* Disabled (Friend's view) */
+/* Disabled (Friend's view) - Force visible checkmark */
 input[type="checkbox"]:disabled { cursor: not-allowed; border-color: var(--border); }
 input[type="checkbox"]:disabled:checked { background-color: var(--primary); opacity: 0.6; }
 input[type="checkbox"]:disabled:not(:checked) { background-color: var(--bg-body); opacity: 0.5; }
@@ -151,7 +151,7 @@ input[type="checkbox"]:disabled:not(:checked) { background-color: var(--bg-body)
 .circle-chart::after { content: ''; width: 27px; height: 27px; background: var(--header-bg); border-radius: 50%; position: absolute; }
 .circle-text { position: relative; z-index: 2; font-size: 0.65rem; color: var(--text-sub); font-weight: 600; }
 
-/* --- MODAL & FRIEND LIST --- */
+/* --- MODAL --- */
 .modal-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
@@ -173,7 +173,7 @@ input[type="checkbox"]:disabled:not(:checked) { background-color: var(--bg-body)
 .input-field.error { border-color: #e74c3c; }
 .input-error-text { color: #e74c3c; font-size: 0.8rem; margin-top: -10px; margin-bottom: 10px; display: none; }
 
-/* Friend List Items */
+/* Friend List */
 .friend-list-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px; border: 1px solid var(--border); border-radius: 8px;
