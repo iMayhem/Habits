@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habits Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+</head>
+<body>
+
+<div class="app-wrapper">
+    <header>
+        <h1>My Habits</h1>
+        <div class="user-info">
+            <span id="userEmail">Loading...</span>
+            <button onclick="shareHabit()" style="background:#6c5ce7; padding:8px 15px; width:auto;">Share Habit</button>
+            <button onclick="logout()" style="background:#333; padding:8px 15px; width:auto;">Log Out</button>
+        </div>
+    </header>
+
+    <div class="table-container">
+        <div class="scroll-area">
+            <table id="trackerTable">
+                <thead><tr id="headerRow"></tr></thead>
+                <tbody id="habitBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <button class="fab" onclick="addHabit()">+</button>
+</div>
+
+<script>
+    const db = getDB();
+    let currentUser = null;
+    let currentDate = new Date();
+
+    // --- AUTH & INIT ---
+    window.onload = async () => {
+        const { data: { session } } = await db.auth.getSession();
+        if (!session) window.location.href = 'index.html';
+        
+        currentUser = session.user;
+        document.getElementById('userEmail').innerText = currentUser.email.split('@')[0];
+        
+        renderHeader();
+        loadHabits();
+    };
+
+    async function logout() {
+        await db.auth.signOut();
+        window.location.href = 'index.html';
+    }
+
+    // --- DATA LOADING ---
+    async function loadHabits() {
+        // 1. Fetch Habits (Own + Shared)
+        const { data: habits, error } = await db
+            .from('habits')
+            .select(`*, habit_permissions(shared_with_user_id, can_edit)`)
+            .order('created_at', { ascending: true });
+
+        if(error) console.error(error);
+
+        // 2. Fetch Logs (Checks) for this month
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
+
+        const { data: logs } = await db
+            .from('habit_logs')
+            .select('*')
+            .gte('log_date', startOfMonth)
+            .lte('log_date', endOfMonth);
+
+        renderBody(habits || [], logs || []);
+    }
+
+    // --- RENDERING ---
+    function renderHeader() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        let html = '<th>HABIT</th>';
+        for(let i=1; i<=daysInMonth; i++) {
+            const d = new Date(year, month, i);
+            const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
+            const isToday = (i === new Date().getDate() && month === new Date().getMonth()) ? 'background:#ffeaa7' : '';
+            html += `<th style="${isToday}"><div>${i}</div><small>${dayName}</small></th>`;
+        }
+        document.getElementById('headerRow').innerHTML = html;
+    }
+
+    function renderBody(habits, logs) {
+        const tbody = document.getElementById('habitBody');
+        tbody.innerHTML = '';
+        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+
+        habits.forEach(habit => {
+            const isShared = habit.user_id !== currentUser.id;
+            const sharedBadge = isShared ? `<span class="shared-badge">Shared</span>` : '';
+            
+            let html = `<td>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>${habit.title} ${sharedBadge}</span>
+                    ${!isShared ? `<span class="delete-btn" onclick="deleteHabit(${habit.id})">&times;</span>` : ''}
+                </div>
+            </td>`;
+
+            for(let i=1; i<=daysInMonth; i++) {
+                const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                
+                // Check if logged
+                const log = logs.find(l => l.habit_id === habit.id && l.log_date === dateStr && l.completed);
+                const checked = log ? 'checked' : '';
+
+                html += `<td>
+                    <input type="checkbox" ${checked} onchange="toggleCheck(${habit.id}, '${dateStr}', this.checked)">
+                </td>`;
+            }
+            const tr = document.createElement('tr');
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- ACTIONS ---
+    async function addHabit() {
+        const title = prompt("New Habit Name:");
+        if(!title) return;
+        await db.from('habits').insert({ user_id: currentUser.id, title: title });
+        loadHabits();
+    }
+
+    async function toggleCheck(habitId, dateStr, isChecked) {
+        if(isChecked) {
+            await db.from('habit_logs').insert({ habit_id: habitId, log_date: dateStr, completed: true });
+        } else {
+            await db.from('habit_logs').delete().match({ habit_id: habitId, log_date: dateStr });
+        }
+    }
+
+    async function deleteHabit(id) {
+        if(confirm("Delete habit?")) {
+            await db.from('habits').delete().eq('id', id);
+            loadHabits();
+        }
+    }
+
+    // --- SHARING LOGIC ---
+    async function shareHabit() {
+        const email = prompt("Enter the EMAIL of the friend to share with:");
+        if(!email) return;
+
+        // 1. Find user ID by email
+        const { data: users, error } = await db.from('profiles').select('id').eq('email', email).single();
+        
+        if(error || !users) {
+            alert("User not found! Ask them to sign up first.");
+            return;
+        }
+
+        // 2. Select which habit to share
+        const habitName = prompt("Which habit name to share?");
+        const { data: habit } = await db.from('habits').select('id').eq('title', habitName).eq('user_id', currentUser.id).single();
+        
+        if(!habit) { alert("Habit not found."); return; }
+
+        // 3. Insert Permission
+        const { error: shareError } = await db.from('habit_permissions').insert({
+            habit_id: habit.id,
+            shared_with_user_id: users.id,
+            can_edit: true // Giving edit access by default
+        });
+
+        if(shareError) alert("Error sharing: " + shareError.message);
+        else alert(`Shared '${habitName}' with ${email}!`);
+    }
+</script>
+</body>
+</html>
