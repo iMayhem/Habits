@@ -15,58 +15,49 @@
     <header>
         <div class="title-group">
             <h1>Habits</h1>
-            <p id="currentDateText" class="subtitle">Loading...</p>
+            <p id="dateDisplay" class="subtitle">...</p>
         </div>
 
         <div class="controls">
-            <!-- Friend Switcher -->
-            <select id="viewSelector" class="view-select" onchange="switchProfileView()">
+            <select id="viewSelector" class="view-select" onchange="switchView()">
                 <option value="me">My Habits</option>
             </select>
-
-            <!-- Manage Friends Btn -->
-            <button class="btn-secondary btn-icon" onclick="openModal('friend')" title="Add Friend">
-                👥
-            </button>
-
-            <!-- Date Nav -->
+            
+            <button class="btn-secondary" onclick="openModal('friend')" title="Add Friend">👥 +</button>
             <button class="btn-secondary" onclick="changeMonth(-1)">‹</button>
             <button class="btn-secondary" onclick="changeMonth(1)">›</button>
-
-            <!-- Logout -->
-            <button class="btn-secondary" onclick="logout()">Log Out</button>
+            <button class="btn-secondary" onclick="logout()">Exit</button>
         </div>
     </header>
 
     <div class="table-wrapper">
-        <table id="trackerTable">
+        <table>
             <thead><tr id="headerRow"></tr></thead>
             <tbody id="habitBody"></tbody>
             <tfoot><tr id="footerRow" class="footer-row"></tr></tfoot>
         </table>
     </div>
 
-    <!-- Add Habit Button (Only visible on own profile) -->
     <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
         <button id="addHabitBtn" class="btn-primary" onclick="openModal('habit')">+ Add Habit</button>
     </div>
 </div>
 
-<!-- === MODAL === -->
+<!-- MODAL -->
 <div class="modal-overlay" id="mainModal">
     <div class="modal">
         <h2 id="modalTitle">Title</h2>
-        <p id="modalDesc" style="color:#666; font-size:0.9rem; margin-bottom:10px;"></p>
+        <p id="modalDesc" style="color:#666; margin-bottom:10px; font-size:0.9rem;"></p>
         
         <input type="text" id="modalInput" class="input-field" placeholder="...">
         
-        <div id="friendOptions" style="display:none; margin-bottom:15px;">
-            <label style="display:flex; align-items:center; gap:10px; font-size:0.9rem;">
-                <input type="checkbox" id="canEditCheck"> Allow them to edit my habits?
+        <div id="friendOptions" style="display:none;">
+            <label style="font-size:0.9rem; display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="canEditCheck"> Allow them to edit/check my habits?
             </label>
         </div>
 
-        <div class="modal-actions">
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
             <button class="btn-secondary" onclick="closeModal()">Cancel</button>
             <button class="btn-primary" id="modalConfirmBtn">Confirm</button>
         </div>
@@ -77,18 +68,19 @@
     const db = getDB();
     let currentUser = null;
     let viewingUserId = null;
-    let canEditCurrentView = true;
-    let currentDate = new Date();
+    let canEdit = true;
+    let dateCursor = new Date();
 
+    // 1. STARTUP
     window.onload = async () => {
         const { data: { session } } = await db.auth.getSession();
         if (!session) { window.location.href = 'index.html'; return; }
         
         currentUser = session.user;
         viewingUserId = currentUser.id;
-
-        await loadFriendsList(); 
-        renderView();
+        
+        await loadFriends();
+        render();
     };
 
     async function logout() {
@@ -96,176 +88,143 @@
         window.location.href = 'index.html';
     }
 
-    // --- RENDER ---
-    async function renderView() {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
+    // 2. MAIN RENDER LOOP
+    async function render() {
+        const year = dateCursor.getFullYear();
+        const month = dateCursor.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        document.getElementById('currentDateText').innerText = 
-            currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-        renderHeader(daysInMonth, year, month);
-
-        // Fetch Habits
-        const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
         
-        // Fetch Logs for this month
-        const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-        const endStr = `${year}-${String(month+1).padStart(2,'0')}-${daysInMonth}`;
-        
-        const { data: logs } = await db.from('habit_logs').select('*')
-            .gte('log_date', startStr).lte('log_date', endStr);
+        // Update Title
+        document.getElementById('dateDisplay').innerText = dateCursor.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        renderBody(habits || [], logs || [], daysInMonth, year, month);
-    }
-
-    function renderHeader(daysInMonth, year, month) {
-        const tr = document.getElementById('headerRow');
-        let html = '<th>HABIT</th>';
+        // Render Header
+        let headerHtml = '<th>HABIT</th>';
         const today = new Date();
-
         for(let i=1; i<=daysInMonth; i++) {
-            const date = new Date(year, month, i);
-            const dayName = date.toLocaleDateString('en-US', {weekday:'narrow'});
-            const isToday = (date.toDateString() === today.toDateString()) ? 'background: #fff0f5; color: var(--primary-dark);' : '';
-            
-            html += `<th style="${isToday}">
-                <div>${i}</div><div style="font-weight:400; opacity:0.6; font-size:0.7rem;">${dayName}</div>
-            </th>`;
+            const d = new Date(year, month, i);
+            const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
+            const isToday = (d.toDateString() === today.toDateString()) ? 'background:#fff0f5; color:#c58a9f;' : '';
+            headerHtml += `<th style="${isToday}"><div>${i}</div><small>${dayName}</small></th>`;
         }
-        tr.innerHTML = html;
-    }
+        document.getElementById('headerRow').innerHTML = headerHtml;
 
-    function renderBody(habits, logs, daysInMonth, year, month) {
+        // Fetch Data
+        const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
+        const { data: logs } = await db.from('habit_logs').select('*')
+            .gte('log_date', `${year}-${month+1}-01`)
+            .lte('log_date', `${year}-${month+1}-${daysInMonth}`);
+
         const tbody = document.getElementById('habitBody');
-        const tfoot = document.getElementById('footerRow');
         tbody.innerHTML = '';
-        
-        const isMe = viewingUserId === currentUser.id;
+        const isMe = (viewingUserId === currentUser.id);
 
-        habits.forEach(habit => {
-            let rowHtml = `<td>
+        // Render Rows
+        habits.forEach(h => {
+            let row = `<tr class="habit-row"><td>
                 <div class="habit-name-wrapper">
-                    <span class="habit-text" onclick="${isMe ? `openModal('rename', ${habit.id}, '${habit.title}')` : ''}">
-                        ${habit.title}
-                    </span>
-                    ${isMe ? `<button class="mini-btn" onclick="deleteHabit(${habit.id})">×</button>` : ''}
+                    <span class="habit-text" onclick="${isMe ? `openModal('rename', ${h.id}, '${h.title}')` : ''}">${h.title}</span>
+                    ${isMe ? `<button class="mini-btn" onclick="deleteHabit(${h.id})">×</button>` : ''}
                 </div>
             </td>`;
 
             for(let i=1; i<=daysInMonth; i++) {
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                const isChecked = logs.some(l => l.habit_id === habit.id && l.log_date === dateStr && l.completed);
-                const disabled = (!isMe && !canEditCurrentView) ? 'disabled' : '';
-
-                rowHtml += `<td>
-                    <input type="checkbox" ${isChecked ? 'checked' : ''} ${disabled} 
-                    onchange="toggleCheck(${habit.id}, '${dateStr}', this.checked)">
-                </td>`;
+                const isChecked = logs.find(l => l.habit_id === h.id && l.log_date === dateStr && l.completed);
+                const disabled = (!isMe && !canEdit) ? 'disabled' : '';
+                
+                row += `<td><input type="checkbox" ${isChecked ? 'checked' : ''} ${disabled} 
+                        onchange="toggleCheck(${h.id}, '${dateStr}', this.checked)"></td>`;
             }
-            tbody.innerHTML += `<tr>${rowHtml}</tr>`;
+            tbody.innerHTML += row + '</tr>';
         });
 
-        // Stats Footer
+        // Render Footer Stats
         let footerHtml = '<td>Daily Progress</td>';
         for(let i=1; i<=daysInMonth; i++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
-            let completed = 0;
-            if(total > 0) {
-                completed = logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length;
-            }
-            let percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-
+            let done = logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length;
+            let percent = total === 0 ? 0 : Math.round((done/total)*100);
+            
             footerHtml += `<td>
                 <div class="circle-chart" style="--p: ${percent}%">
                     <span class="circle-text">${percent}%</span>
                 </div>
             </td>`;
         }
-        tfoot.innerHTML = `<tr>${footerHtml}</tr>`;
+        document.getElementById('footerRow').innerHTML = footerHtml;
     }
 
-    // --- ACTIONS ---
+    // 3. ACTIONS
     async function toggleCheck(habitId, dateStr, checked) {
-        if(checked) await db.from('habit_logs').insert({ habit_id: habitId, log_date: dateStr, completed: true });
+        if(checked) await db.from('habit_logs').insert({ habit_id: habitId, log_date: dateStr });
         else await db.from('habit_logs').delete().match({ habit_id: habitId, log_date: dateStr });
-        renderView();
+        render(); // Refresh for stats
     }
 
     async function deleteHabit(id) {
-        if(confirm("Delete habit?")) {
+        if(confirm("Delete?")) {
             await db.from('habits').delete().eq('id', id);
-            renderView();
+            render();
         }
     }
 
-    async function loadFriendsList() {
+    async function loadFriends() {
+        // Load list of people who shared with ME
         const { data } = await db.from('profile_access')
-            .select(`owner_id, can_edit, profiles:owner_id (email)`)
+            .select('owner_id, can_edit, profiles:owner_id(email)')
             .eq('viewer_id', currentUser.id);
+            
+        const sel = document.getElementById('viewSelector');
+        sel.innerHTML = '<option value="me">My Habits</option>';
         
-        const select = document.getElementById('viewSelector');
-        select.innerHTML = '<option value="me">My Habits</option>'; 
-
         if(data) {
-            data.forEach(item => {
+            data.forEach(row => {
                 const opt = document.createElement('option');
-                opt.value = item.owner_id;
-                opt.dataset.edit = item.can_edit;
-                opt.innerText = item.profiles.email.split('@')[0] + "'s Habits";
-                select.appendChild(opt);
+                opt.value = row.owner_id;
+                opt.dataset.edit = row.can_edit;
+                opt.innerText = row.profiles.email.split('@')[0] + "'s Habits";
+                sel.appendChild(opt);
             });
         }
     }
 
-    function switchProfileView() {
-        const select = document.getElementById('viewSelector');
-        if(select.value === 'me') {
+    function switchView() {
+        const sel = document.getElementById('viewSelector');
+        if(sel.value === 'me') {
             viewingUserId = currentUser.id;
-            canEditCurrentView = true;
+            canEdit = true;
             document.getElementById('addHabitBtn').style.display = 'block';
         } else {
-            viewingUserId = select.value;
-            canEditCurrentView = select.options[select.selectedIndex].dataset.edit === 'true';
+            viewingUserId = sel.value;
+            canEdit = (sel.options[sel.selectedIndex].dataset.edit === 'true');
             document.getElementById('addHabitBtn').style.display = 'none';
         }
-        renderView();
+        render();
     }
 
     function changeMonth(dir) {
-        currentDate.setMonth(currentDate.getMonth() + dir);
-        renderView();
+        dateCursor.setMonth(dateCursor.getMonth() + dir);
+        render();
     }
 
-    // --- MODAL SYSTEM ---
-    let currentModalType = '';
-    let currentHabitId = null;
-
-    function openModal(type, id=null, existingText='') {
+    // 4. MODALS
+    let mType = '', mId = null;
+    function openModal(type, id=null, txt='') {
+        mType = type; mId = id;
         const overlay = document.getElementById('mainModal');
         const title = document.getElementById('modalTitle');
-        const desc = document.getElementById('modalDesc');
         const input = document.getElementById('modalInput');
         const friendOpts = document.getElementById('friendOptions');
         
-        currentModalType = type;
-        currentHabitId = id;
-        input.value = existingText;
-        friendOpts.style.display = 'none';
         overlay.classList.add('active');
+        input.value = txt;
+        friendOpts.style.display = 'none';
 
-        if(type === 'habit') {
-            title.innerText = "New Habit";
-            desc.innerText = "What do you want to track?";
-            input.placeholder = "e.g. Read 10 mins";
-        } else if (type === 'rename') {
-            title.innerText = "Rename Habit";
-            desc.innerText = "Update name:";
-        } else if (type === 'friend') {
-            title.innerText = "Add Friend";
-            desc.innerText = "Enter friend's email to grant access.";
+        if(type === 'habit') { title.innerText = "New Habit"; input.placeholder = "Ex: Read 10 mins"; }
+        else if (type === 'rename') { title.innerText = "Rename"; }
+        else if (type === 'friend') { 
+            title.innerText = "Share with Friend"; 
             input.placeholder = "friend@email.com";
             friendOpts.style.display = 'block';
         }
@@ -279,25 +238,25 @@
         if(!val) return;
         closeModal();
 
-        if(currentModalType === 'habit') {
+        if(mType === 'habit') {
             await db.from('habits').insert({ user_id: currentUser.id, title: val });
-            renderView();
         } 
-        else if (currentModalType === 'rename') {
-            await db.from('habits').update({ title: val }).eq('id', currentHabitId);
-            renderView();
+        else if (mType === 'rename') {
+            await db.from('habits').update({ title: val }).eq('id', mId);
         }
-        else if (currentModalType === 'friend') {
-            const { data: user } = await db.from('profiles').select('id').eq('email', val).single();
-            if(!user) return alert("User not found! They must sign up first.");
+        else if (mType === 'friend') {
+            // Find User
+            const { data: friend } = await db.from('profiles').select('id').eq('email', val).single();
+            if(!friend) return alert("User not found! They must have an account first.");
             
             const canEdit = document.getElementById('canEditCheck').checked;
             const { error } = await db.from('profile_access').insert({
-                owner_id: currentUser.id, viewer_id: user.id, can_edit: canEdit
+                owner_id: currentUser.id, viewer_id: friend.id, can_edit: canEdit
             });
-            if(error) alert("Error: " + error.message);
-            else alert(`Friend added!`);
+            if(error) alert("Already shared or error occurred.");
+            else alert("Shared successfully!");
         }
+        render();
     };
 </script>
 </body>
