@@ -19,6 +19,11 @@
     <div id="syncDot" class="sync-dot"></div><span id="syncText">Saved</span>
 </div>
 
+<!-- Mobile FAB -->
+<button id="mobileFab" onclick="openModal('habit')">
+    <i class="ph ph-plus"></i>
+</button>
+
 <div class="app-container">
     <header>
         <div class="brand">
@@ -67,7 +72,7 @@
     </div>
 
     <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-        <button id="addHabitBtn" class="btn-primary" onclick="openModal('habit')">
+        <button id="desktopAddBtn" class="btn-primary" onclick="openModal('habit')">
             <i class="ph ph-plus-circle" style="font-size: 1.2rem;"></i> Add Habit
         </button>
     </div>
@@ -115,7 +120,7 @@
         setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
     };
 
-    // --- 1. USERNAME SYSTEM (BLOCKING) ---
+    // --- 1. USERNAME SYSTEM ---
     async function checkUsername() {
         const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
         if(data) {
@@ -185,7 +190,7 @@
         const clickAttr = isMe ? `onclick="openModal('rename_list')"` : '';
         const editIcon = isMe ? `<i class="ph ph-pencil-simple" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i>` : '';
         
-        let html = `<th><div style="display:flex; align-items:center; padding-left:15px; cursor:pointer;" ${clickAttr}>${currentListTitle}${editIcon}</div></th>`;
+        let html = `<th><div style="display:flex; align-items:center; padding-left:25px; cursor:pointer;" ${clickAttr}>${currentListTitle}${editIcon}</div></th>`;
         const today = new Date();
         
         for(let i=1; i<=days; i++) {
@@ -221,7 +226,7 @@
     }
 
     function renderFooter(days, year, month, habits, logs) {
-        let html = '<td><div style="padding-left:15px; font-weight:600;">Daily %</div></td>';
+        let html = '<td><div style="padding-left:25px;">Daily %</div></td>';
         for(let i=1; i<=days; i++) {
             const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
@@ -232,7 +237,7 @@
         document.getElementById('footerRow').innerHTML = html;
     }
 
-    // --- ACTIONS & SYNC ---
+    // --- ACTIONS ---
     function setSync(status) {
         const box = document.getElementById('syncStatus');
         const dot = document.getElementById('syncDot');
@@ -262,7 +267,7 @@
         const next = current === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
-        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-sun':'ph-moon', next==='dark'?'ph-moon':'ph-sun');
+        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-sun':'ph-moon', next==='dark'?'ph-sun':'ph-moon');
     }
     
     async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
@@ -283,8 +288,20 @@
 
     function switchView() {
         const s = document.getElementById('viewSelector');
-        if(s.value === 'me') { viewingUserId = currentUser.id; canEdit = true; document.getElementById('addHabitBtn').style.display = 'flex'; }
-        else { viewingUserId = s.value; canEdit = (s.options[s.selectedIndex].dataset.edit === 'true'); document.getElementById('addHabitBtn').style.display = 'none'; }
+        const desktopBtn = document.getElementById('desktopAddBtn');
+        const mobileBtn = document.getElementById('mobileFab');
+        
+        if(s.value === 'me') { 
+            viewingUserId = currentUser.id; 
+            canEdit = true; 
+            if(desktopBtn) desktopBtn.style.display = 'flex'; 
+            if(mobileBtn) mobileBtn.style.display = 'flex';
+        } else { 
+            viewingUserId = s.value; 
+            canEdit = (s.options[s.selectedIndex].dataset.edit === 'true'); 
+            if(desktopBtn) desktopBtn.style.display = 'none';
+            if(mobileBtn) mobileBtn.style.display = 'none';
+        }
         render();
     }
 
