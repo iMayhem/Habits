@@ -5,73 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | Habits</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
 </head>
-<body>
-    <div class="auth-box">
-        <h1 style="color: var(--primary-dark);">Habits</h1>
-        <p class="subtitle" style="margin-bottom: 30px;">Login with Username or Email</p>
+<body style="justify-content: center;">
 
-        <input type="text" id="identity" class="input-field" placeholder="Username or Email">
-        <input type="password" id="password" class="input-field" placeholder="Password">
+    <div class="app-container" style="max-width: 400px; min-height: auto; text-align: center;">
+        <div style="margin-bottom: 20px;">
+            <i class="ph-fill ph-check-circle" style="font-size: 3rem; color: var(--primary);"></i>
+        </div>
+        <h1>Welcome Back</h1>
+        <p style="color: var(--text-sub); margin-bottom: 30px;">Login with Username or Email</p>
+
+        <div class="input-group">
+            <input type="text" id="identity" class="input-field" placeholder="Username or Email">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" class="input-field" placeholder="Password">
+        </div>
 
         <button onclick="handleAuth()" id="authBtn" class="btn-primary" style="width: 100%; justify-content: center;">
-            Log In / Sign Up
+            Start Tracking
         </button>
-        <p id="msg" style="margin-top: 15px; font-size: 0.85rem;"></p>
+        <p id="msg" style="margin-top: 15px; font-size: 0.85rem; color: var(--error);"></p>
     </div>
 
     <script>
         const db = getDB();
         
+        // Auto-redirect
+        async function init() {
+            const { data: { session } } = await db.auth.getSession();
+            if(session) window.location.href = 'dashboard.html';
+        }
+        init();
+
         async function handleAuth() {
             const input = document.getElementById('identity').value.trim();
             const password = document.getElementById('password').value;
             const btn = document.getElementById('authBtn');
             const msg = document.getElementById('msg');
 
-            if(!input || !password) return msg.innerText = "Please enter login details.";
+            if(!input || !password) return msg.innerText = "Please fill in all fields.";
 
-            btn.innerText = "Checking..."; msg.innerText = "";
-            let emailToUse = input;
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i>';
+            msg.innerText = "";
+            
+            let email = input;
 
-            // Username Logic
+            // If username provided, resolve to email
             if (!input.includes('@')) {
-                const { data, error } = await db.from('profiles').select('email').eq('username', input).single();
-                if (error || !data) {
-                    btn.innerText = "Log In / Sign Up"; msg.style.color = 'red'; msg.innerText = "Username not found."; return;
+                const { data } = await db.from('profiles').select('email').eq('username', input).single();
+                if (!data) {
+                    btn.innerText = "Start Tracking";
+                    msg.innerText = "Username not found.";
+                    return;
                 }
-                emailToUse = data.email;
+                email = data.email;
             }
 
-            btn.innerText = "Processing...";
-            let { error } = await db.auth.signInWithPassword({ email: emailToUse, password });
+            // Login
+            let { error } = await db.auth.signInWithPassword({ email, password });
             
             if (error) {
+                // Try SignUp if login fails (auto-register logic)
                 if (input.includes('@')) {
-                    const { error: signUpError } = await db.auth.signUp({ email: emailToUse, password });
-                    if (signUpError) {
-                        msg.style.color = 'red'; msg.innerText = signUpError.message;
-                    } else {
-                        msg.style.color = 'green'; msg.innerText = "Account created! Logging in...";
+                    const { error: signErr } = await db.auth.signUp({ email, password });
+                    if (signErr) msg.innerText = signErr.message;
+                    else {
+                        msg.style.color = 'var(--success)';
+                        msg.innerText = "Account created! Redirecting...";
                         setTimeout(() => window.location.href = 'dashboard.html', 1500);
                     }
                 } else {
-                    msg.style.color = 'red'; msg.innerText = "Incorrect password.";
+                    msg.innerText = "Incorrect password.";
                 }
-                btn.innerText = "Log In / Sign Up";
+                btn.innerText = "Start Tracking";
             } else {
                 window.location.href = 'dashboard.html';
             }
         }
-
-        async function checkUser() {
-            const { data: { session } } = await db.auth.getSession();
-            if (session) window.location.href = 'dashboard.html';
-        }
-        checkUser();
     </script>
 </body>
 </html>
