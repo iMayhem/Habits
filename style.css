@@ -1,151 +1,45 @@
-:root {
-    --primary: #dfaec0;      /* Dusty Pink */
-    --primary-dark: #c58a9f;
-    --text: #444;
-    --bg: #fcfcfc;
-    --border: #f0f0f0;
-    --success: #8bc34a;
-}
+/* Add this to your existing style.css */
 
-* { box-sizing: border-box; outline: none; }
-
-body {
-    font-family: 'Poppins', sans-serif;
-    background-color: #f8f9fa;
-    background-image: radial-gradient(#e8e8e8 1px, transparent 1px);
-    background-size: 20px 20px;
-    color: var(--text);
-    margin: 0; padding: 0;
-    min-height: 100vh;
-    display: flex; flex-direction: column; align-items: center;
-}
-
-/* App Container */
-.app-container {
-    width: 95%; max-width: 1400px; margin-top: 40px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    border-radius: 24px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-    padding: 30px;
-    border: 1px solid white;
-    position: relative;
-}
-
-/* Header */
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
-h1 { font-size: 1.8rem; font-weight: 600; color: #333; margin: 0; }
-.subtitle { color: #888; font-size: 0.9rem; }
-
-.controls { display: flex; gap: 10px; align-items: center; }
-
-/* Buttons */
-button {
-    padding: 10px 18px; border-radius: 12px; border: none;
-    font-weight: 500; cursor: pointer; font-family: inherit;
-    transition: 0.2s; display: flex; align-items: center; gap: 5px; font-size: 0.9rem;
-}
-.btn-primary { background: #333; color: white; }
-.btn-primary:hover { background: #000; transform: translateY(-2px); }
-.btn-secondary { background: white; border: 1px solid #ddd; color: #666; }
-.btn-secondary:hover { background: #f5f5f5; }
-
-/* Dropdown */
-.view-select {
-    padding: 10px; border-radius: 12px; border: 1px solid #ddd;
-    font-family: inherit; background: white; cursor: pointer;
-}
-
-/* TABLE FIXES FOR STICKY COLUMNS */
-.table-wrapper { 
-    overflow-x: auto; 
-    border-radius: 16px; 
-    border: 1px solid var(--border); 
-    background: white; 
-    position: relative;
-}
-
-table { 
-    width: 100%; 
-    border-collapse: separate; /* Critical for sticky to work */
-    border-spacing: 0; 
-    min-width: 1000px; 
-}
-
-th, td { 
-    padding: 15px; 
-    text-align: center; 
-    border-bottom: 1px solid var(--border); 
-    vertical-align: middle; 
+/* Sync Indicator (Top Left Corner) */
+.sync-status {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     background: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #666;
+    z-index: 1000;
+    border: 1px solid #eee;
+    transition: 0.3s;
+    opacity: 0; /* Hidden by default, shown when active */
 }
+.sync-status.visible { opacity: 1; }
 
-/* Sticky First Column Configuration */
-th:first-child, td:first-child {
-    position: sticky; 
-    left: 0; 
-    z-index: 20;
-    border-right: 2px solid var(--border); 
-    min-width: 260px;
-    text-align: left; 
-    padding-left: 25px;
-    background: white; /* Ensure it's opaque */
+.sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ccc;
 }
+.sync-dot.saving { background: #f1c40f; animation: pulse 1s infinite; }
+.sync-dot.saved { background: #2ecc71; }
+.sync-dot.error { background: #e74c3c; }
 
-/* Header Specifics */
-th { background: #fffcfd; font-weight: 600; font-size: 0.85rem; color: #888; letter-spacing: 0.5px; z-index: 10; }
-/* Corner cell needs higher z-index */
-th:first-child { z-index: 30; background: #fffcfd; } 
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* Footer Specifics */
-.footer-row td { 
-    background: #fffcfd; 
-    font-weight: bold; 
-    border-top: 2px solid var(--border); 
-    height: 70px; 
+/* Make the "HABIT" header look editable */
+.editable-header {
+    cursor: pointer;
+    border-bottom: 1px dashed #ccc;
+    display: inline-block;
+    transition: 0.2s;
 }
-/* Footer Sticky Cell */
-.footer-row td:first-child {
-    z-index: 30;
-    background: #fffcfd; /* Ensure it covers scrolling content */
+.editable-header:hover {
+    color: var(--primary-dark);
+    border-bottom: 1px dashed var(--primary);
 }
-
-/* Checkboxes */
-input[type="checkbox"] {
-    appearance: none; width: 24px; height: 24px;
-    border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer;
-    transition: 0.2s; position: relative; background: white;
-}
-input[type="checkbox"]:checked { background-color: var(--primary); border-color: var(--primary); transform: scale(1.1); }
-input[type="checkbox"]:checked::after {
-    content: '✓'; position: absolute; color: white; font-size: 14px;
-    left: 50%; top: 50%; transform: translate(-50%, -50%);
-}
-
-/* Circle Chart */
-.circle-chart {
-    width: 35px; height: 35px; border-radius: 50%;
-    background: conic-gradient(var(--primary) var(--p, 0%), #eee 0%);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto;
-}
-.circle-chart::after { content: ''; width: 27px; height: 27px; background: white; border-radius: 50%; position: absolute; }
-.circle-text { position: relative; z-index: 2; font-size: 0.65rem; color: #555; }
-
-/* Modal */
-.modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.3); backdrop-filter: blur(3px);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s;
-}
-.modal-overlay.active { opacity: 1; pointer-events: all; }
-.modal {
-    background: white; width: 400px; padding: 30px; border-radius: 20px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.15); transform: translateY(20px); transition: 0.3s;
-}
-.modal-overlay.active .modal { transform: translateY(0); }
-.input-field { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin: 15px 0; font-family: inherit; }
-
-/* Auth Box */
-.auth-box { width: 100%; max-width: 380px; margin-top: 10vh; background: white; padding: 40px; border-radius: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
