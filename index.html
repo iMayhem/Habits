@@ -1,39 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Habits</title>
+    <title>Zenith Login</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
 </head>
 <body>
-    <div class="auth-wrapper">
-        <!-- Glowing Orbs for Background Effect -->
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
+    <div class="auth-container">
+        <h1 style="margin-bottom: 10px;">Zenith <span style="color:var(--primary)">Tracker</span></h1>
+        <p style="color:var(--text-muted); margin-bottom: 30px;">Your habits, shared.</p>
 
-        <div class="auth-card">
-            <div class="brand-logo">Habits.</div>
-            <p class="subtitle">Master your routine, together.</p>
-            
-            <div class="input-group">
-                <input type="email" id="email" placeholder="hello@example.com" autocomplete="email">
-            </div>
-            <div class="input-group">
-                <input type="password" id="password" placeholder="Your Password">
-            </div>
-            
-            <button class="btn-primary" onclick="handleAuth()" id="authBtn">Enter App</button>
-            <p id="msg" style="margin-top:20px; font-size:0.85rem; min-height:20px;"></p>
-        </div>
+        <input type="email" id="email" class="auth-input" placeholder="Enter email">
+        <input type="password" id="password" class="auth-input" placeholder="Enter password">
+        
+        <button onclick="handleAuth()" id="authBtn" class="auth-btn">Log In / Sign Up</button>
+        <p id="msg" style="margin-top: 20px; font-size: 0.9rem;"></p>
     </div>
 
     <script>
         const db = getDB();
 
+        // Auto-redirect if logged in
         async function checkUser() {
             const { data: { session } } = await db.auth.getSession();
             if (session) window.location.href = 'dashboard.html';
@@ -47,33 +38,31 @@
             const msg = document.getElementById('msg');
 
             if(!email || !password) {
-                msg.style.color = '#ff7675';
                 msg.innerText = "Please enter email and password";
+                msg.style.color = "#ff7675";
                 return;
             }
 
-            btn.innerText = "Verifying...";
-            msg.innerText = "";
+            btn.innerText = "Processing...";
             
-            // 1. Try Login
+            // Try Login
             let { data, error } = await db.auth.signInWithPassword({ email, password });
             
             if (error) {
-                // 2. If Login fails, Try SignUp
+                // Try SignUp
                 const { data: signUpData, error: signUpError } = await db.auth.signUp({ 
-                    email, 
-                    password,
+                    email, password,
                     options: { data: { full_name: email.split('@')[0] } }
                 });
                 
                 if (signUpError) {
-                    msg.style.color = '#ff7675'; // Danger Red
+                    msg.style.color = '#ff7675';
                     msg.innerText = signUpError.message;
-                    btn.innerText = "Try Again";
+                    btn.innerText = "Log In / Sign Up";
                 } else {
-                    msg.style.color = '#00b894'; // Success Green
-                    msg.innerText = "Welcome! Creating your space...";
-                    setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+                    msg.style.color = '#00b894';
+                    msg.innerText = "Account created! Logging in...";
+                    setTimeout(() => window.location.href = 'dashboard.html', 1000);
                 }
             } else {
                 window.location.href = 'dashboard.html';
