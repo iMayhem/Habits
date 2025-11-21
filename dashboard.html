@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,8 +30,13 @@
             </select>
             
             <button class="btn-secondary" onclick="openModal('friend')" title="Add Friend">👥 +</button>
+            
             <button class="btn-secondary" onclick="changeMonth(-1)">‹</button>
             <button class="btn-secondary" onclick="changeMonth(1)">›</button>
+            
+            <!-- Dark Mode Button -->
+            <button class="btn-secondary" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
+
             <button class="btn-secondary" onclick="logout()">Exit</button>
         </div>
     </header>
@@ -53,12 +58,12 @@
 <div class="modal-overlay" id="mainModal">
     <div class="modal">
         <h2 id="modalTitle">Title</h2>
-        <p id="modalDesc" style="color:#666; margin-bottom:10px; font-size:0.9rem;"></p>
+        <p id="modalDesc" style="color:var(--text-sub); margin-bottom:10px; font-size:0.9rem;"></p>
         
         <input type="text" id="modalInput" class="input-field" placeholder="...">
         
         <div id="friendOptions" style="display:none;">
-            <label style="font-size:0.9rem; display:flex; align-items:center; gap:8px;">
+            <label style="font-size:0.9rem; display:flex; align-items:center; gap:8px; color:var(--text-main);">
                 <input type="checkbox" id="canEditCheck"> Allow them to edit/check my habits?
             </label>
         </div>
@@ -79,6 +84,10 @@
     let currentListTitle = "HABIT";
 
     window.onload = async () => {
+        // Load Theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
         const { data: { session } } = await db.auth.getSession();
         if (!session) { window.location.href = 'index.html'; return; }
         
@@ -94,6 +103,13 @@
         window.location.href = 'index.html';
     }
 
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    }
+
     async function render() {
         setSync('saving');
         const year = dateCursor.getFullYear();
@@ -102,24 +118,18 @@
         
         document.getElementById('dateDisplay').innerText = dateCursor.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // A. Get List Title
         const { data: profile } = await db.from('profiles').select('list_title').eq('id', viewingUserId).single();
         currentListTitle = profile ? profile.list_title : "HABIT";
         
-        // B. Get Habits
         const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
 
-        // C. Get Logs (Specific Fix for Friends)
         let logs = [];
         if (habits && habits.length > 0) {
             const habitIds = habits.map(h => h.id);
             const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
             const endStr = `${year}-${String(month+1).padStart(2,'0')}-${daysInMonth}`;
             const { data: logData } = await db.from('habit_logs')
-                .select('*')
-                .in('habit_id', habitIds)
-                .gte('log_date', startStr)
-                .lte('log_date', endStr);
+                .select('*').in('habit_id', habitIds).gte('log_date', startStr).lte('log_date', endStr);
             logs = logData || [];
         }
 
@@ -133,7 +143,7 @@
         const isMe = (viewingUserId === currentUser.id);
         const action = isMe ? `onclick="openModal('listTitle', null, '${currentListTitle}')"` : '';
         const cls = isMe ? 'editable-header' : '';
-        const hint = isMe ? '<span style="font-size:0.6rem; color:#aaa; font-weight:normal; margin-left:5px;">✎</span>' : '';
+        const hint = isMe ? '<span style="font-size:0.6rem; opacity:0.5; font-weight:normal; margin-left:5px;">✎</span>' : '';
 
         let html = `<th><span class="${cls}" ${action}>${currentListTitle}</span>${hint}</th>`;
         
@@ -141,7 +151,7 @@
         for(let i=1; i<=daysInMonth; i++) {
             const d = new Date(year, month, i);
             const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
-            const isToday = (d.toDateString() === today.toDateString()) ? 'background:#fff0f5; color:#c58a9f;' : '';
+            const isToday = (d.toDateString() === today.toDateString()) ? 'background:var(--highlight); color:var(--highlight-text);' : '';
             html += `<th style="${isToday}"><div>${i}</div><small>${dayName}</small></th>`;
         }
         document.getElementById('headerRow').innerHTML = html;
@@ -153,7 +163,7 @@
         const isMe = (viewingUserId === currentUser.id);
 
         if(habits.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:#999;">No habits found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${daysInMonth+1}" style="padding:30px; color:var(--text-sub);">No habits found.</td></tr>`;
         } else {
             habits.forEach(h => {
                 let row = `<tr class="habit-row"><td>
@@ -167,6 +177,7 @@
                     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                     const isChecked = logs.find(l => l.habit_id === h.id && l.log_date === dateStr && l.completed);
                     const disabled = (!isMe && !canEdit) ? 'disabled' : '';
+                    // The checkmark will now be visible in CSS even if disabled
                     row += `<td><input type="checkbox" ${isChecked ? 'checked' : ''} ${disabled} 
                             onchange="toggleCheck(${h.id}, '${dateStr}', this.checked)"></td>`;
                 }
