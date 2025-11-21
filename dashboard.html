@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Habits Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
 </head>
 <body>
 
-<!-- Full Screen Loader -->
 <div id="appLoader" class="loader-overlay">
     <div class="spinner"></div>
 </div>
 
-<!-- Main App -->
+<div id="syncStatus" class="sync-status">
+    <div id="syncDot" class="sync-dot"></div><span id="syncText">Saved</span>
+</div>
+
 <div class="app-container">
     <header>
         <div class="brand">
@@ -45,7 +45,7 @@
             <button class="btn-icon" onclick="changeMonth(1)"><i class="ph ph-caret-right"></i></button>
             
             <button class="btn-icon" onclick="toggleTheme()">
-                <i class="ph ph-moon" id="themeIcon"></i>
+                <i class="ph ph-sun" id="themeIcon"></i>
             </button>
             
             <button class="btn-icon" onclick="logout()" style="color: var(--error);">
@@ -96,40 +96,35 @@
     let currentListTitle = "HABITS";
     let myUsername = "";
 
-    // --- INIT ---
     window.onload = async () => {
         // Theme
-        const theme = localStorage.getItem('theme') || 'light';
+        const theme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', theme);
-        document.getElementById('themeIcon').classList.replace('ph-moon', theme === 'dark' ? 'ph-sun' : 'ph-moon');
+        document.getElementById('themeIcon').classList.replace(theme === 'dark' ? 'ph-moon' : 'ph-sun', theme === 'dark' ? 'ph-sun' : 'ph-moon');
 
-        // Auth
         const { data: { session } } = await db.auth.getSession();
         if (!session) { window.location.href = 'index.html'; return; }
         
         currentUser = session.user;
         viewingUserId = currentUser.id;
 
-        // Critical Checks
         await checkUsername();
         await loadFriends();
         await render();
 
-        // Fade out loader
         document.getElementById('appLoader').style.opacity = '0';
         setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
     };
 
-    // --- 1. USERNAME SYSTEM (BLOCKING) ---
+    // --- 1. USERNAME (BLOCKING) ---
     async function checkUsername() {
         const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
         if(data) {
             myUsername = data.username;
-            if(myUsername.startsWith('user_')) { // Temp username detected
+            if(myUsername.startsWith('user_')) { 
                 openModal('setup_username');
-                // Lock modal
                 document.querySelector('.modal-overlay').style.pointerEvents = 'auto'; 
-                document.querySelector('.modal-overlay button.btn-icon').style.display = 'none'; // Hide close X
+                document.querySelector('.modal-overlay button.btn-icon').style.display = 'none'; 
             }
         }
     }
@@ -163,14 +158,11 @@
         
         document.getElementById('dateDisplay').innerText = dateCursor.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // Get Title
         const { data: profile } = await db.from('profiles').select('list_title').eq('id', viewingUserId).single();
         currentListTitle = profile ? profile.list_title : "HABITS";
 
-        // Get Habits
         const { data: habits } = await db.from('habits').select('*').eq('user_id', viewingUserId).order('created_at');
         
-        // Get Logs
         let logs = [];
         if (habits && habits.length > 0) {
             const ids = habits.map(h => h.id);
@@ -180,12 +172,10 @@
             logs = data || [];
         }
 
-        // Empty State Logic
         const hasHabits = habits && habits.length > 0;
         document.getElementById('emptyState').style.display = hasHabits ? 'none' : 'block';
         document.getElementById('habitBody').style.display = hasHabits ? 'table-row-group' : 'none';
 
-        // Draw
         renderHeader(daysInMonth, year, month);
         if(hasHabits) renderBody(habits, logs, daysInMonth, year, month);
         renderFooter(daysInMonth, year, month, habits, logs);
@@ -202,7 +192,7 @@
         for(let i=1; i<=days; i++) {
             const d = new Date(year, month, i);
             const isToday = d.toDateString() === today.toDateString();
-            const bgStyle = isToday ? 'background: var(--highlight); color: var(--primary-hover);' : '';
+            const bgStyle = isToday ? 'background: var(--highlight); color: var(--primary);' : '';
             const dayName = d.toLocaleDateString('en-US', {weekday:'narrow'});
             html += `<th style="${bgStyle}"><div>${i}</div><div style="font-size:0.6rem; font-weight:400;">${dayName}</div></th>`;
         }
@@ -243,27 +233,43 @@
         document.getElementById('footerRow').innerHTML = html;
     }
 
-    // --- ACTIONS ---
+    // --- ACTIONS & SYNC ---
+    function setSync(status) {
+        const box = document.getElementById('syncStatus');
+        const dot = document.getElementById('syncDot');
+        const txt = document.getElementById('syncText');
+        box.classList.add('visible');
+        dot.className = 'sync-dot ' + status;
+        if(status === 'saving') txt.innerText = "Syncing...";
+        else if (status === 'saved') { txt.innerText = "Saved"; setTimeout(() => box.classList.remove('visible'), 2000); }
+        else txt.innerText = "Error";
+    }
+
     async function toggle(hid, date, val) {
+        setSync('saving');
         if(val) await db.from('habit_logs').insert({ habit_id: hid, log_date: date });
         else await db.from('habit_logs').delete().match({ habit_id: hid, log_date: date });
-        render();
+        render(); setSync('saved');
     }
 
     async function deleteHabit(id) {
-        if(confirm("Delete habit?")) { await db.from('habits').delete().eq('id', id); render(); }
+        if(confirm("Delete habit?")) { setSync('saving'); await db.from('habits').delete().eq('id', id); render(); setSync('saved'); }
     }
 
     function changeMonth(d) { dateCursor.setMonth(dateCursor.getMonth() + d); render(); }
+    
     function toggleTheme() {
-        const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next); localStorage.setItem('theme', next);
-        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-moon':'ph-sun', next==='dark'?'ph-sun':'ph-moon');
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-sun':'ph-moon', next==='dark'?'ph-moon':'ph-sun');
     }
+    
     async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
 
     // --- FRIENDS & MODALS ---
-    let modalState = {}; // Stores current action data
+    let modalState = {}; 
 
     async function loadFriends() {
         const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(username)').eq('viewer_id', currentUser.id);
@@ -311,11 +317,11 @@
                     <i id="uStatus" class="input-status"></i>
                 </div>
             `;
-            btn.disabled = true; // Wait for validation
+            btn.disabled = true; 
         }
         else if (type === 'friends') {
             title.innerText = "Friends";
-            btn.style.display = 'none'; // Hide default save
+            btn.style.display = 'none'; 
             renderFriendManager(body);
         }
         else if (type === 'rename_list') {
@@ -325,9 +331,7 @@
     }
 
     async function renderFriendManager(container) {
-        // Get who I shared with
         const { data } = await db.from('profile_access').select('id, viewer_id, can_edit, profiles:viewer_id(username)').eq('owner_id', currentUser.id);
-        
         let html = `
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <input type="text" id="friendInput" class="input-field" placeholder="Enter Username">
@@ -376,14 +380,20 @@
         const btn = document.getElementById('modalActionBtn');
         btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i>';
 
+        setSync('saving');
         if(modalState.type === 'habit') await db.from('habits').insert({ user_id: currentUser.id, title: val });
         else if (modalState.type === 'rename_habit') await db.from('habits').update({ title: val }).eq('id', modalState.id);
         else if (modalState.type === 'rename_list') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
         else if (modalState.type === 'setup_username' || modalState.type === 'settings') {
             const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
-            if(!error) myUsername = val;
+            if(!error) { 
+                myUsername = val; 
+                // AUTO-RELOAD FIX
+                window.location.reload();
+                return; 
+            }
         }
-        
+        setSync('saved');
         btn.innerText = 'Save';
         closeModal();
         render();
