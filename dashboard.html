@@ -11,10 +11,8 @@
 </head>
 <body>
 
-<!-- Sync Status (Bottom Left) -->
 <div id="syncStatus" class="sync-status">
-    <div id="syncDot" class="sync-dot"></div>
-    <span id="syncText">Saved</span>
+    <div id="syncDot" class="sync-dot"></div><span id="syncText">Saved</span>
 </div>
 
 <div class="app-container">
@@ -29,14 +27,17 @@
                 <option value="me">My Habits</option>
             </select>
             
-            <button class="btn-secondary" onclick="openModal('friend')" title="Add Friend">👥 +</button>
+            <!-- Friend Manager Button -->
+            <button class="btn-secondary" onclick="openModal('friendsList')" title="Manage Friends">👥</button>
             
+            <!-- Settings (Username) -->
+            <button class="btn-icon-only" onclick="openModal('settings')" title="Settings">⚙️</button>
+
+            <div style="border-left:1px solid var(--border); height:20px; margin:0 5px;"></div>
+
             <button class="btn-secondary" onclick="changeMonth(-1)">‹</button>
             <button class="btn-secondary" onclick="changeMonth(1)">›</button>
-            
-            <!-- Dark Mode Button -->
-            <button class="btn-secondary" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
-
+            <button class="btn-secondary" onclick="toggleTheme()">🌙</button>
             <button class="btn-secondary" onclick="logout()">Exit</button>
         </div>
     </header>
@@ -54,22 +55,19 @@
     </div>
 </div>
 
-<!-- MODAL -->
+<!-- GENERIC MODAL -->
 <div class="modal-overlay" id="mainModal">
     <div class="modal">
         <h2 id="modalTitle">Title</h2>
         <p id="modalDesc" style="color:var(--text-sub); margin-bottom:10px; font-size:0.9rem;"></p>
         
-        <input type="text" id="modalInput" class="input-field" placeholder="...">
-        
-        <div id="friendOptions" style="display:none;">
-            <label style="font-size:0.9rem; display:flex; align-items:center; gap:8px; color:var(--text-main);">
-                <input type="checkbox" id="canEditCheck"> Allow them to edit/check my habits?
-            </label>
+        <div id="modalContent">
+            <input type="text" id="modalInput" class="input-field" placeholder="...">
+            <div id="inputError" class="input-error-text">Username taken!</div>
         </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+        
+        <div class="modal-actions" id="modalActions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="btn-secondary modal-close" onclick="closeModal()">Cancel</button>
             <button class="btn-primary" id="modalConfirmBtn">Confirm</button>
         </div>
     </div>
@@ -82,9 +80,9 @@
     let canEdit = true;
     let dateCursor = new Date();
     let currentListTitle = "HABIT";
+    let myUsername = "";
 
     window.onload = async () => {
-        // Load Theme
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
 
@@ -94,20 +92,21 @@
         currentUser = session.user;
         viewingUserId = currentUser.id;
         
-        await loadFriends();
+        await checkUsernameSetup();
+        await loadFriendsDropdown();
         render();
     };
 
-    async function logout() {
-        await db.auth.signOut();
-        window.location.href = 'index.html';
-    }
-
-    function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
+    // --- 1. LOGIC: USERNAME & RENDER ---
+    async function checkUsernameSetup() {
+        const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
+        if (data) {
+            myUsername = data.username;
+            if (myUsername.includes('@') || myUsername.includes('_0.')) {
+                openModal('username', null, myUsername);
+                document.getElementById('mainModal').classList.add('locked');
+            }
+        }
     }
 
     async function render() {
@@ -115,7 +114,6 @@
         const year = dateCursor.getFullYear();
         const month = dateCursor.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
         document.getElementById('dateDisplay').innerText = dateCursor.toLocaleString('default', { month: 'long', year: 'numeric' });
 
         const { data: profile } = await db.from('profiles').select('list_title').eq('id', viewingUserId).single();
@@ -128,8 +126,8 @@
             const habitIds = habits.map(h => h.id);
             const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
             const endStr = `${year}-${String(month+1).padStart(2,'0')}-${daysInMonth}`;
-            const { data: logData } = await db.from('habit_logs')
-                .select('*').in('habit_id', habitIds).gte('log_date', startStr).lte('log_date', endStr);
+            const { data: logData } = await db.from('habit_logs').select('*')
+                .in('habit_id', habitIds).gte('log_date', startStr).lte('log_date', endStr);
             logs = logData || [];
         }
 
@@ -143,10 +141,9 @@
         const isMe = (viewingUserId === currentUser.id);
         const action = isMe ? `onclick="openModal('listTitle', null, '${currentListTitle}')"` : '';
         const cls = isMe ? 'editable-header' : '';
-        const hint = isMe ? '<span style="font-size:0.6rem; opacity:0.5; font-weight:normal; margin-left:5px;">✎</span>' : '';
+        const hint = isMe ? '<span style="font-size:0.6rem; opacity:0.5; margin-left:5px;">✎</span>' : '';
 
         let html = `<th><span class="${cls}" ${action}>${currentListTitle}</span>${hint}</th>`;
-        
         const today = new Date();
         for(let i=1; i<=daysInMonth; i++) {
             const d = new Date(year, month, i);
@@ -177,7 +174,6 @@
                     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                     const isChecked = logs.find(l => l.habit_id === h.id && l.log_date === dateStr && l.completed);
                     const disabled = (!isMe && !canEdit) ? 'disabled' : '';
-                    // The checkmark will now be visible in CSS even if disabled
                     row += `<td><input type="checkbox" ${isChecked ? 'checked' : ''} ${disabled} 
                             onchange="toggleCheck(${h.id}, '${dateStr}', this.checked)"></td>`;
                 }
@@ -191,34 +187,28 @@
         for(let i=1; i<=daysInMonth; i++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
-            let done = 0;
-            if(total > 0) done = logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length;
+            let done = (total > 0) ? logs.filter(l => habits.some(h => h.id === l.habit_id) && l.log_date === dateStr).length : 0;
             let percent = total === 0 ? 0 : Math.round((done/total)*100);
-            
             footerHtml += `<td><div class="circle-chart" style="--p: ${percent}%"><span class="circle-text">${percent}%</span></div></td>`;
         }
         document.getElementById('footerRow').innerHTML = footerHtml;
     }
 
-    // ACTIONS
+    // --- 2. ACTIONS ---
     function setSync(status) {
         const box = document.getElementById('syncStatus');
         const dot = document.getElementById('syncDot');
-        const txt = document.getElementById('syncText');
         box.classList.add('visible');
         dot.className = 'sync-dot ' + status;
-        if(status === 'saving') txt.innerText = "Syncing...";
-        else if (status === 'saved') {
-            txt.innerText = "Saved";
-            setTimeout(() => box.classList.remove('visible'), 2000);
-        } else txt.innerText = "Error";
+        document.getElementById('syncText').innerText = status === 'saving' ? "Syncing..." : status === 'saved' ? "Saved" : "Error";
+        if(status === 'saved') setTimeout(() => box.classList.remove('visible'), 2000);
     }
 
     async function toggleCheck(habitId, dateStr, checked) {
         setSync('saving');
         if(checked) await db.from('habit_logs').insert({ habit_id: habitId, log_date: dateStr });
         else await db.from('habit_logs').delete().match({ habit_id: habitId, log_date: dateStr });
-        render(); 
+        render();
     }
 
     async function deleteHabit(id) {
@@ -229,8 +219,8 @@
         }
     }
 
-    async function loadFriends() {
-        const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(email)').eq('viewer_id', currentUser.id);
+    async function loadFriendsDropdown() {
+        const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(username)').eq('viewer_id', currentUser.id);
         const sel = document.getElementById('viewSelector');
         sel.innerHTML = '<option value="me">My Habits</option>';
         if(data) {
@@ -238,64 +228,127 @@
                 const opt = document.createElement('option');
                 opt.value = row.owner_id;
                 opt.dataset.edit = row.can_edit;
-                opt.innerText = row.profiles.email.split('@')[0] + "'s Habits";
+                opt.innerText = (row.profiles.username || "Friend") + "'s Habits";
                 sel.appendChild(opt);
             });
         }
     }
 
+    async function renderFriendsList() {
+        const { data } = await db.from('profile_access').select('id, viewer_id, can_edit, profiles:viewer_id(username)').eq('owner_id', currentUser.id);
+        const container = document.getElementById('modalContent');
+        container.innerHTML = `
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="addFriendInput" class="input-field" placeholder="Enter Username to add" style="margin:0;">
+                <button class="btn-primary" onclick="addFriendByUsername()">Add</button>
+            </div>
+            <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+            <div style="max-height:200px; overflow-y:auto;">
+                ${data.length ? '' : '<p style="color:var(--text-sub); text-align:center;">No friends added yet.</p>'}
+                ${data.map(f => `
+                    <div class="friend-list-item">
+                        <span class="friend-info">${f.profiles.username}</span>
+                        <div class="friend-actions">
+                            <div class="permission-toggle ${f.can_edit ? 'active' : ''}" 
+                                 onclick="togglePermission(${f.id}, ${!f.can_edit})">
+                                 ${f.can_edit ? 'Editor' : 'Viewer'}
+                            </div>
+                            <span class="remove-friend-btn" onclick="removeFriend(${f.id})">×</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async function addFriendByUsername() {
+        const username = document.getElementById('addFriendInput').value.trim();
+        if(!username) return;
+        setSync('saving');
+        const { data: user } = await db.from('profiles').select('id').eq('username', username).single();
+        if(!user) { alert("Username not found!"); setSync('error'); return; }
+        if(user.id === currentUser.id) { alert("You cannot add yourself."); return; }
+        const { error } = await db.from('profile_access').insert({ owner_id: currentUser.id, viewer_id: user.id });
+        if(error) alert("Already added!"); else { renderFriendsList(); }
+        setSync('saved');
+    }
+
+    async function togglePermission(accessId, newVal) {
+        await db.from('profile_access').update({ can_edit: newVal }).eq('id', accessId);
+        renderFriendsList();
+    }
+    async function removeFriend(accessId) {
+        if(confirm("Remove?")) { await db.from('profile_access').delete().eq('id', accessId); renderFriendsList(); }
+    }
+
     function switchView() {
         const sel = document.getElementById('viewSelector');
         if(sel.value === 'me') {
-            viewingUserId = currentUser.id;
-            canEdit = true;
-            document.getElementById('addHabitBtn').style.display = 'block';
+            viewingUserId = currentUser.id; canEdit = true; document.getElementById('addHabitBtn').style.display = 'block';
         } else {
-            viewingUserId = sel.value;
-            canEdit = (sel.options[sel.selectedIndex].dataset.edit === 'true');
-            document.getElementById('addHabitBtn').style.display = 'none';
+            viewingUserId = sel.value; canEdit = (sel.options[sel.selectedIndex].dataset.edit === 'true'); document.getElementById('addHabitBtn').style.display = 'none';
         }
         render();
     }
 
-    function changeMonth(dir) {
-        dateCursor.setMonth(dateCursor.getMonth() + dir);
-        render();
+    function changeMonth(dir) { dateCursor.setMonth(dateCursor.getMonth() + dir); render(); }
+    function toggleTheme() {
+        const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next); localStorage.setItem('theme', next);
     }
+    async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
 
-    // MODALS
+    // --- 3. MODALS ---
     let mType = '', mId = null;
     function openModal(type, id=null, txt='') {
         mType = type; mId = id;
         const overlay = document.getElementById('mainModal');
         const title = document.getElementById('modalTitle');
-        const input = document.getElementById('modalInput');
-        const friendOpts = document.getElementById('friendOptions');
-        overlay.classList.add('active');
-        input.value = txt;
-        friendOpts.style.display = 'none';
+        const desc = document.getElementById('modalDesc');
+        const content = document.getElementById('modalContent');
+        const actions = document.getElementById('modalActions');
+        
+        overlay.classList.remove('locked'); overlay.classList.add('active'); actions.style.display = 'flex';
 
-        if(type === 'habit') { title.innerText = "New Habit"; input.placeholder = "Ex: Read 10 mins"; }
-        else if (type === 'rename') { title.innerText = "Rename"; }
-        else if (type === 'listTitle') { title.innerText = "List Name"; input.placeholder = "Ex: My Morning Routine"; }
-        else if (type === 'friend') { title.innerText = "Share with Friend"; input.placeholder = "friend@email.com"; friendOpts.style.display = 'block'; }
-        input.focus();
+        if(type === 'habit') {
+            title.innerText = "New Habit"; desc.innerText = "";
+            content.innerHTML = `<input type="text" id="modalInput" class="input-field" placeholder="Ex: Read 10 mins">`;
+            setTimeout(() => document.getElementById('modalInput').focus(), 100);
+        } 
+        else if (type === 'rename') {
+            title.innerText = "Rename"; desc.innerText = "";
+            content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`;
+        }
+        else if (type === 'listTitle') {
+            title.innerText = "List Name"; desc.innerText = "";
+            content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt}">`;
+        }
+        else if (type === 'settings' || type === 'username') {
+            title.innerText = "Pick a Username"; desc.innerText = "This is how friends will find you.";
+            content.innerHTML = `<input type="text" id="modalInput" class="input-field" value="${txt || myUsername}" placeholder="username"><div id="inputError" class="input-error-text">Username taken!</div>`;
+            if(type === 'username') actions.querySelector('.modal-close').style.display = 'none';
+        }
+        else if (type === 'friendsList') {
+            title.innerText = "Manage Friends"; desc.innerText = "Share your habits with others.";
+            actions.style.display = 'none'; renderFriendsList();
+        }
     }
 
     function closeModal() { document.getElementById('mainModal').classList.remove('active'); }
 
     document.getElementById('modalConfirmBtn').onclick = async () => {
-        const val = document.getElementById('modalInput').value;
-        if(!val) return;
+        const input = document.getElementById('modalInput');
+        if(!input) return; const val = input.value.trim(); if(!val) return;
+
         setSync('saving');
         try {
             if(mType === 'habit') await db.from('habits').insert({ user_id: currentUser.id, title: val });
             else if (mType === 'rename') await db.from('habits').update({ title: val }).eq('id', mId);
             else if (mType === 'listTitle') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
-            else if (mType === 'friend') {
-                const { data: f } = await db.from('profiles').select('id').eq('email', val).single();
-                if(!f) alert("User not found!");
-                else await db.from('profile_access').insert({ owner_id: currentUser.id, viewer_id: f.id, can_edit: document.getElementById('canEditCheck').checked });
+            else if (mType === 'username' || mType === 'settings') {
+                const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
+                if(error) { document.getElementById('inputError').style.display = 'block'; setSync('error'); return; }
+                else myUsername = val;
             }
             closeModal(); render();
         } catch(e) { alert("Error: " + e.message); setSync('error'); }
