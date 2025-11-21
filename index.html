@@ -1,73 +1,71 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zenith Login</title>
+    <title>Login | Habits</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
 </head>
 <body>
-    <div class="auth-container">
-        <h1 style="margin-bottom: 10px;">Zenith <span style="color:var(--primary)">Tracker</span></h1>
-        <p style="color:var(--text-muted); margin-bottom: 30px;">Your habits, shared.</p>
+    <div class="auth-box">
+        <h1 style="color: var(--primary-dark);">Habits</h1>
+        <p class="subtitle" style="margin-bottom: 30px;">Build your routine together.</p>
 
-        <input type="email" id="email" class="auth-input" placeholder="Enter email">
-        <input type="password" id="password" class="auth-input" placeholder="Enter password">
-        
-        <button onclick="handleAuth()" id="authBtn" class="auth-btn">Log In / Sign Up</button>
-        <p id="msg" style="margin-top: 20px; font-size: 0.9rem;"></p>
+        <input type="email" id="email" class="input-field" placeholder="Email address">
+        <input type="password" id="password" class="input-field" placeholder="Password">
+
+        <button onclick="handleAuth()" id="authBtn" class="btn-primary" style="width: 100%; justify-content: center;">
+            Log In / Sign Up
+        </button>
+        <p id="msg" style="margin-top: 15px; font-size: 0.85rem;"></p>
     </div>
 
     <script>
         const db = getDB();
-
-        // Auto-redirect if logged in
-        async function checkUser() {
-            const { data: { session } } = await db.auth.getSession();
-            if (session) window.location.href = 'dashboard.html';
-        }
-        checkUser();
-
+        
         async function handleAuth() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const btn = document.getElementById('authBtn');
             const msg = document.getElementById('msg');
 
-            if(!email || !password) {
-                msg.innerText = "Please enter email and password";
-                msg.style.color = "#ff7675";
-                return;
-            }
+            if(!email || !password) return msg.innerText = "Please enter email & password.";
 
             btn.innerText = "Processing...";
             
-            // Try Login
-            let { data, error } = await db.auth.signInWithPassword({ email, password });
+            // 1. Try Login
+            let { error } = await db.auth.signInWithPassword({ email, password });
             
             if (error) {
-                // Try SignUp
-                const { data: signUpData, error: signUpError } = await db.auth.signUp({ 
-                    email, password,
-                    options: { data: { full_name: email.split('@')[0] } }
+                // 2. If Login fails, Try SignUp
+                const { error: signUpError } = await db.auth.signUp({ 
+                    email, password
                 });
                 
                 if (signUpError) {
-                    msg.style.color = '#ff7675';
-                    msg.innerText = signUpError.message;
+                    msg.style.color = 'red'; 
+                    msg.innerText = signUpError.message; 
                     btn.innerText = "Log In / Sign Up";
                 } else {
-                    msg.style.color = '#00b894';
+                    msg.style.color = 'green'; 
                     msg.innerText = "Account created! Logging in...";
-                    setTimeout(() => window.location.href = 'dashboard.html', 1000);
+                    // Wait a moment for the trigger to create the profile
+                    setTimeout(() => window.location.href = 'dashboard.html', 1500);
                 }
             } else {
                 window.location.href = 'dashboard.html';
             }
         }
+
+        // Check session on load
+        async function checkUser() {
+            const { data: { session } } = await db.auth.getSession();
+            if (session) window.location.href = 'dashboard.html';
+        }
+        checkUser();
     </script>
 </body>
 </html>
