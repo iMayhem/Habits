@@ -9,7 +9,7 @@
     --bg-surface: #1e1e1e;
     --text-main: #e0e0e0;
     --text-sub: #666;
-    --border: rgba(255, 255, 255, 0.08); /* Subtle lines */
+    --border: rgba(255, 255, 255, 0.1); /* Slightly sharper for grid */
     --shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
     --header-bg: #1e1e1e;
     --highlight: #2d2025;
@@ -18,14 +18,13 @@
 }
 
 [data-theme="light"] {
-    /* --- LIGHT MODE OVERRIDES --- */
     --primary: #dfaec0;
     --primary-hover: #c58a9f;
     --bg-body: #fcfcfc;
     --bg-surface: #ffffff;
     --text-main: #2d3436;
     --text-sub: #a0a0a0;
-    --border: #f0f0f0;
+    --border: #e0e0e0;
     --shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
     --header-bg: #fcfcfc;
     --highlight: #fff0f5;
@@ -47,7 +46,7 @@ body {
     display: flex; flex-direction: column; align-items: center;
 }
 
-/* --- SYNC STATUS (Bottom Left) --- */
+/* --- SYNC STATUS --- */
 .sync-status {
     position: fixed; bottom: 25px; left: 25px;
     display: flex; align-items: center; gap: 10px;
@@ -64,7 +63,7 @@ body {
 .sync-dot.error { background: var(--error); }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* --- UI COMPONENTS --- */
+/* --- MAIN CONTAINER --- */
 .app-container {
     width: 95%; max-width: 1400px; margin: 40px auto;
     background: var(--bg-surface);
@@ -84,48 +83,64 @@ header { display: flex; justify-content: space-between; align-items: center; fle
 
 .controls { display: flex; align-items: center; gap: 8px; background: var(--bg-body); padding: 5px; border-radius: 16px; border: 1px solid var(--border); }
 
-/* Buttons & Icons */
+/* Buttons */
 button { cursor: pointer; transition: 0.2s; border: none; font-family: inherit; display: flex; align-items: center; justify-content: center; }
-.btn-icon {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--bg-surface); color: var(--text-main);
-    font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
+.btn-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-surface); color: var(--text-main); font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 .btn-icon:hover { background: var(--primary); color: white; transform: translateY(-2px); }
 
-.btn-primary {
-    background: var(--text-main); color: var(--bg-surface);
-    padding: 10px 20px; border-radius: 12px; font-weight: 600; gap: 8px;
-}
+.btn-primary { background: var(--text-main); color: var(--bg-surface); padding: 10px 20px; border-radius: 12px; font-weight: 600; gap: 8px; }
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); opacity: 0.9; }
 
-.view-select {
-    padding: 8px 15px; border-radius: 12px; border: none;
-    background: var(--bg-surface); color: var(--text-main);
-    font-weight: 500; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
+.view-select { padding: 8px 15px; border-radius: 12px; border: none; background: var(--bg-surface); color: var(--text-main); font-weight: 500; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-/* Table & Grid */
+/* --- TABLE SYSTEM (THE FIX) --- */
 .table-wrapper { 
     overflow-x: auto; border-radius: 16px; 
     border: 1px solid var(--border); background: var(--bg-surface);
     margin-bottom: 20px; max-height: 70vh;
 }
-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
 
-th, td { padding: 12px; text-align: center; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
-th { font-size: 0.75rem; color: var(--text-sub); background: var(--header-bg); font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+table { 
+    width: 100%; 
+    border-collapse: separate; /* Allows sticky headers */
+    border-spacing: 0; /* Removes gap between cells (The Fix) */
+    min-width: 800px; 
+}
+
+th, td { 
+    padding: 0; /* Remove padding to fit content exactly */
+    height: 50px; /* Fixed row height for alignment */
+    text-align: center; 
+    border-bottom: 1px solid var(--border); 
+    border-right: 1px solid var(--border); /* Grid vertical lines */
+    background: var(--bg-surface);
+    vertical-align: middle;
+}
+
+/* Remove right border from last column to prevent double border */
+th:last-child, td:last-child { border-right: none; }
+
+/* Header Styling */
+th { 
+    font-size: 0.75rem; color: var(--text-sub); 
+    background: var(--header-bg); font-weight: 600; 
+    position: sticky; top: 0; z-index: 10; 
+}
 
 /* Sticky First Column */
 th:first-child, td:first-child {
     position: sticky; left: 0; z-index: 20;
-    background: var(--bg-surface); border-right: 1px solid var(--border);
-    text-align: left; padding-left: 20px; min-width: 200px;
+    background: var(--bg-surface); 
+    border-right: 1px solid var(--border);
+    min-width: 200px;
+    /* Flex to align text properly */
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 15px;
+    height: 50px; /* Match table row height */
 }
 th:first-child { background: var(--header-bg); z-index: 30; }
 
 /* Habit Text */
-.habit-row { transition: 0.2s; }
 .habit-row:hover td { background: var(--bg-body); }
 .habit-name { font-weight: 500; cursor: pointer; width: 100%; display: flex; justify-content: space-between; align-items: center; }
 .habit-actions { opacity: 0; transition: 0.2s; display: flex; gap: 5px; }
@@ -133,11 +148,12 @@ th:first-child { background: var(--header-bg); z-index: 30; }
 .action-icon { color: var(--text-sub); font-size: 1rem; padding: 6px; border-radius: 50%; transition: 0.2s; }
 .action-icon:hover { color: var(--error); background: rgba(255,0,0,0.1); }
 
-/* Checkboxes */
+/* --- CHECKBOXES (PERFECTLY CENTERED) --- */
 input[type="checkbox"] {
     appearance: none; width: 24px; height: 24px;
     border: 2px solid var(--border); border-radius: 8px;
     cursor: pointer; transition: 0.2s; background: var(--bg-body);
+    display: block; margin: 0 auto; /* Center Horizontally */
 }
 input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); }
 input[type="checkbox"]:checked::after {
@@ -192,7 +208,7 @@ input[type="checkbox"]:disabled:checked { background: var(--primary); opacity: 0
 .empty-state { padding: 60px; text-align: center; color: var(--text-sub); }
 .empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.2; }
 
-/* Login Page Specific */
+/* Login Page */
 .auth-container {
     width: 90%; max-width: 400px; text-align: center;
     background: var(--bg-surface); padding: 40px; border-radius: 24px;
@@ -201,7 +217,6 @@ input[type="checkbox"]:disabled:checked { background: var(--primary); opacity: 0
 }
 .theme-toggle-absolute { position: absolute; top: 20px; right: 20px; }
 
-/* Mobile Tweaks */
 @media (max-width: 600px) {
     .app-container { width: 100%; margin: 0; border: none; border-radius: 0; min-height: 100vh; }
     .controls { width: 100%; justify-content: space-between; margin-top: 10px; background: transparent; border: none; padding: 0; }

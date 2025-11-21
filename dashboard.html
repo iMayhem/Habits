@@ -97,7 +97,6 @@
     let myUsername = "";
 
     window.onload = async () => {
-        // Theme
         const theme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', theme);
         document.getElementById('themeIcon').classList.replace(theme === 'dark' ? 'ph-moon' : 'ph-sun', theme === 'dark' ? 'ph-sun' : 'ph-moon');
@@ -116,7 +115,7 @@
         setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
     };
 
-    // --- 1. USERNAME (BLOCKING) ---
+    // --- 1. USERNAME SYSTEM (BLOCKING) ---
     async function checkUsername() {
         const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
         if(data) {
@@ -186,7 +185,7 @@
         const clickAttr = isMe ? `onclick="openModal('rename_list')"` : '';
         const editIcon = isMe ? `<i class="ph ph-pencil-simple" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i>` : '';
         
-        let html = `<th style="cursor:pointer;" ${clickAttr}>${currentListTitle}${editIcon}</th>`;
+        let html = `<th><div style="display:flex; align-items:center; padding-left:15px; cursor:pointer;" ${clickAttr}>${currentListTitle}${editIcon}</div></th>`;
         const today = new Date();
         
         for(let i=1; i<=days; i++) {
@@ -206,10 +205,10 @@
 
         habits.forEach(h => {
             let row = `<tr class="habit-row">
-                <td class="habit-name">
+                <td><div class="habit-name">
                     <span onclick="${isMe ? `openModal('rename_habit', ${h.id}, '${h.title}')` : ''}">${h.title}</span>
                     ${isMe ? `<div class="habit-actions"><i class="ph ph-trash action-icon" onclick="deleteHabit(${h.id})"></i></div>` : ''}
-                </td>`;
+                </div></td>`;
             
             for(let i=1; i<=days; i++) {
                 const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
@@ -222,7 +221,7 @@
     }
 
     function renderFooter(days, year, month, habits, logs) {
-        let html = '<td>Daily %</td>';
+        let html = '<td><div style="padding-left:15px; font-weight:600;">Daily %</div></td>';
         for(let i=1; i<=days; i++) {
             const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
