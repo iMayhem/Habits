@@ -3,27 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Habits Login</title>
+    <title>Login | Habits</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
 </head>
 <body>
-    <div class="auth-container">
-        <h1 style="color:var(--primary)">Habits</h1>
-        <p>Track together. Grow together.</p>
-        
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        
-        <button onclick="handleAuth()" id="authBtn">Log In / Sign Up</button>
-        <p id="msg" style="margin-top:15px; font-size:0.9rem;"></p>
+    <div class="auth-wrapper">
+        <!-- Glowing Orbs for Background Effect -->
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+
+        <div class="auth-card">
+            <div class="brand-logo">Habits.</div>
+            <p class="subtitle">Master your routine, together.</p>
+            
+            <div class="input-group">
+                <input type="email" id="email" placeholder="hello@example.com" autocomplete="email">
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Your Password">
+            </div>
+            
+            <button class="btn-primary" onclick="handleAuth()" id="authBtn">Enter App</button>
+            <p id="msg" style="margin-top:20px; font-size:0.85rem; min-height:20px;"></p>
+        </div>
     </div>
 
     <script>
         const db = getDB();
 
-        // Check if already logged in
         async function checkUser() {
             const { data: { session } } = await db.auth.getSession();
             if (session) window.location.href = 'dashboard.html';
@@ -36,26 +46,34 @@
             const btn = document.getElementById('authBtn');
             const msg = document.getElementById('msg');
 
-            if(!email || !password) return alert("Please enter email and password");
+            if(!email || !password) {
+                msg.style.color = '#ff7675';
+                msg.innerText = "Please enter email and password";
+                return;
+            }
 
-            btn.innerText = "Processing...";
+            btn.innerText = "Verifying...";
+            msg.innerText = "";
             
-            // Try Login First
+            // 1. Try Login
             let { data, error } = await db.auth.signInWithPassword({ email, password });
             
             if (error) {
-                // If login fails, try SignUp
-                console.log("Login failed, trying signup...");
-                const { data: signUpData, error: signUpError } = await db.auth.signUp({ email, password });
+                // 2. If Login fails, Try SignUp
+                const { data: signUpData, error: signUpError } = await db.auth.signUp({ 
+                    email, 
+                    password,
+                    options: { data: { full_name: email.split('@')[0] } }
+                });
                 
                 if (signUpError) {
-                    msg.style.color = 'red';
+                    msg.style.color = '#ff7675'; // Danger Red
                     msg.innerText = signUpError.message;
-                    btn.innerText = "Log In / Sign Up";
+                    btn.innerText = "Try Again";
                 } else {
-                    msg.style.color = 'green';
-                    msg.innerText = "Account created! Logging in...";
-                    window.location.href = 'dashboard.html';
+                    msg.style.color = '#00b894'; // Success Green
+                    msg.innerText = "Welcome! Creating your space...";
+                    setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
                 }
             } else {
                 window.location.href = 'dashboard.html';
