@@ -12,7 +12,6 @@
 <body style="justify-content: center;">
 
     <div class="auth-container">
-        <!-- Theme Toggle -->
         <button class="btn-icon theme-toggle-absolute" onclick="toggleTheme()">
             <i class="ph ph-sun" id="themeIcon"></i>
         </button>
@@ -39,7 +38,6 @@
     <script>
         const db = getDB();
         
-        // Theme Logic
         function initTheme() {
             const saved = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
@@ -55,7 +53,6 @@
             document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-moon':'ph-sun', next==='dark'?'ph-sun':'ph-moon');
         }
 
-        // Auto-redirect
         async function init() {
             const { data: { session } } = await db.auth.getSession();
             if(session) window.location.href = 'dashboard.html';
