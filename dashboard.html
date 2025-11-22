@@ -11,12 +11,10 @@
 </head>
 <body>
 
-<!-- Loader -->
 <div id="appLoader" class="loader-overlay">
     <div class="spinner"></div>
 </div>
 
-<!-- Sync Status -->
 <div id="syncStatus" class="sync-status">
     <div id="syncDot" class="sync-dot"></div><span id="syncText">Saved</span>
 </div>
@@ -42,7 +40,6 @@
                 <i class="ph ph-users"></i>
             </button>
             
-            <!-- Study Room -->
             <button class="btn-icon" onclick="openModal('study')" title="Study Room">
                 <i class="ph ph-clock"></i>
             </button>
@@ -107,39 +104,33 @@
     let dateCursor = new Date();
     let currentListTitle = "HABITS";
     let myUsername = "";
-    
-    // Realtime
     let roomChannel, myStudyStart = null, onlineUsers = {};
 
     window.onload = async () => {
         try {
-            // 1. Init Theme
             const theme = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', theme);
             document.getElementById('themeIcon').classList.replace(theme === 'dark' ? 'ph-moon' : 'ph-sun', theme === 'dark' ? 'ph-sun' : 'ph-moon');
 
-            // 2. Check Auth
             const { data: { session } } = await db.auth.getSession();
             if (!session) { window.location.href = 'index.html'; return; }
             
             currentUser = session.user;
             viewingUserId = currentUser.id;
 
-            // 3. Init Study Time
             const savedStart = localStorage.getItem('studyStartTime');
             if (savedStart) myStudyStart = parseInt(savedStart);
 
-            // 4. Critical Loads
+            // Load Data
             await checkUsername();
             await loadFriends();
             await render();
             initRealtime();
 
         } catch (err) {
-            console.error("Init Error:", err);
-            alert("Something went wrong loading data. Please refresh.");
+            console.error("Error during init:", err);
         } finally {
-            // 5. SAFETY NET: Always hide loader
+            // ALWAYS remove loader
             document.getElementById('appLoader').style.opacity = '0';
             setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
         }
@@ -166,12 +157,6 @@
     }
 
     function updateOnlineUI() {
-        document.querySelectorAll('.status-dot-user').forEach(el => {
-            const uid = el.dataset.uid;
-            if (onlineUsers[uid]) el.className = `status-dot-user ${onlineUsers[uid].is_studying ? 'studying' : 'online'}`;
-            else el.className = 'status-dot-user';
-        });
-        
         const container = document.getElementById('activeStudyingList');
         if (container) {
             let html = '';
@@ -193,18 +178,15 @@
         });
     }
 
-    // --- CORE LOGIC ---
+    // --- LOGIC ---
     async function checkUsername() {
-        // Check profile exists, if not create temp one (Fallback fix)
         let { data, error } = await db.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
-        
         if (!data) {
-            // Force create profile if missing
-            const tempName = 'user_' + Math.floor(Math.random() * 10000);
-            await db.from('profiles').insert({ id: currentUser.id, email: currentUser.email, username: tempName });
-            data = { username: tempName };
+            // Auto-heal missing profile
+            const temp = 'user_' + Math.floor(Math.random() * 99999);
+            await db.from('profiles').insert({ id: currentUser.id, email: currentUser.email, username: temp });
+            data = { username: temp };
         }
-
         myUsername = data.username;
         if(myUsername.startsWith('user_')) { 
             openModal('setup_username');
@@ -265,7 +247,6 @@
         
         let html = `<th style="cursor:pointer;" ${clickAttr}>${currentListTitle}${editIcon}</th>`;
         const today = new Date();
-        
         for(let i=1; i<=days; i++) {
             const d = new Date(year, month, i);
             const isToday = d.toDateString() === today.toDateString();
@@ -345,7 +326,7 @@
     
     async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
 
-    // --- FRIENDS & MODALS ---
+    // --- MODALS ---
     let modalState = {}; 
 
     async function loadFriends() {
@@ -444,13 +425,9 @@
         if(!data || data.length === 0) html += `<p style="text-align:center; color:var(--text-sub);">No friends added yet.</p>`;
         else {
             data.forEach(f => {
-                const uid = f.profiles.id;
-                const isOnline = onlineUsers[uid];
-                const dotClass = isOnline ? (isOnline.is_studying ? 'studying' : 'online') : '';
                 html += `
                 <div class="friend-list-item">
                     <div style="display:flex; align-items:center;">
-                        <div class="status-dot-user ${dotClass}" data-uid="${uid}"></div>
                         <span class="friend-info">${f.profiles.username}</span>
                     </div>
                     <div class="friend-actions">
@@ -496,18 +473,24 @@
         const val = document.getElementById('mInput').value;
         if(!val) return;
         setSync('saving');
-        if(modalState.type === 'habit') await db.from('habits').insert({ user_id: currentUser.id, title: val });
-        else if (modalState.type === 'rename_habit') await db.from('habits').update({ title: val }).eq('id', modalState.id);
-        else if (modalState.type === 'rename_list') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
-        else if (modalState.type === 'setup_username' || modalState.type === 'settings') {
-            const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
-            if(!error) { 
-                myUsername = val; 
-                window.location.reload(); 
-                return; 
+        try {
+            if(modalState.type === 'habit') await db.from('habits').insert({ user_id: currentUser.id, title: val });
+            else if (modalState.type === 'rename_habit') await db.from('habits').update({ title: val }).eq('id', modalState.id);
+            else if (modalState.type === 'rename_list') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
+            else if (modalState.type === 'setup_username' || modalState.type === 'settings') {
+                const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
+                if(!error) { 
+                    myUsername = val;
+                    // NO RELOAD - Just close modal
+                    closeModal();
+                    document.getElementById('modalOverlay').style.pointerEvents = '';
+                    document.querySelector('.modal-overlay button.btn-icon').style.display = 'block';
+                    setSync('saved');
+                    return;
+                }
             }
-        }
-        setSync('saved'); closeModal(); render();
+            closeModal(); render();
+        } catch(e) { setSync('error'); }
     };
 </script>
 </body>
