@@ -2,17 +2,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* DARK MODE DEFAULTS */
+    /* DARK MODE DEFAULT */
     --primary: #d48a9f;
     --primary-hover: #e8aebf;
     --bg-body: #121212;
     --bg-surface: #1e1e1e;
     --text-main: #e0e0e0;
     --text-sub: #888;
-    /* Made borders slightly more visible for better grid definition */
     --border: rgba(255, 255, 255, 0.15);
     --shadow: 0 20px 50px -10px rgba(0,0,0,0.6);
-    --header-bg: #252525; /* Slightly lighter than surface for contrast */
+    --header-bg: #252525;
     --highlight: #2d2025;
     --success: #66bb6a;
     --error: #ff6b6b;
@@ -47,7 +46,7 @@ body {
     display: flex; flex-direction: column; align-items: center;
 }
 
-/* --- SYNC STATUS (Bottom Left) --- */
+/* --- SYNC STATUS --- */
 .sync-status {
     position: fixed; bottom: 25px; left: 25px;
     display: flex; align-items: center; gap: 10px;
@@ -64,7 +63,7 @@ body {
 .sync-dot.error { background: var(--error); }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* --- MAIN CONTAINER --- */
+/* --- CONTAINER --- */
 .app-container {
     width: 95%; max-width: 1400px; margin: 40px auto;
     background: var(--bg-surface);
@@ -77,8 +76,7 @@ body {
 }
 
 header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
-.brand { display: flex; flex-direction: column; }
-.brand h1 { font-size: 1.5rem; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+.brand h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
 .brand p { font-size: 0.85rem; color: var(--text-sub); margin: 0; }
 
 .controls { display: flex; align-items: center; gap: 8px; background: var(--bg-body); padding: 5px; border-radius: 16px; border: 1px solid var(--border); }
@@ -89,20 +87,18 @@ button { cursor: pointer; transition: 0.2s; border: none; font-family: inherit; 
 .btn-icon:hover { background: var(--primary); color: white; transform: translateY(-2px); }
 
 .btn-primary { background: var(--text-main); color: var(--bg-surface); padding: 10px 20px; border-radius: 12px; font-weight: 600; gap: 8px; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); opacity: 0.9; }
+.btn-primary:hover { transform: translateY(-2px); opacity: 0.9; }
 
 .view-select { padding: 8px 15px; border-radius: 12px; border: none; background: var(--bg-surface); color: var(--text-main); font-weight: 500; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-/* --- TABLE SYSTEM (Improved Borders) --- */
+/* --- TABLE SYSTEM --- */
 .table-wrapper { 
     overflow-x: auto; border-radius: 16px; 
     border: 1px solid var(--border); background: var(--bg-surface);
     margin-bottom: 20px; max-height: 70vh;
 }
 
-table { 
-    width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; 
-}
+table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
 
 th, td { 
     padding: 0; height: 60px; text-align: center; 
@@ -111,7 +107,6 @@ th, td {
 }
 th:last-child, td:last-child { border-right: none; }
 
-/* Sticky Logic */
 th { 
     font-size: 0.75rem; color: var(--text-sub); background: var(--header-bg); font-weight: 600; 
     position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border);
@@ -123,7 +118,6 @@ th:first-child, td:first-child {
 }
 th:first-child { background: var(--header-bg); z-index: 30; }
 
-/* Sticky Footer */
 .footer-row td { background: var(--header-bg); font-weight: bold; border-top: 2px solid var(--border); height: 70px; }
 .footer-row td:first-child { position: sticky; left: 0; z-index: 30; background: var(--header-bg); border-right: 1px solid var(--border); padding-left: 15px; }
 
@@ -135,7 +129,7 @@ th:first-child { background: var(--header-bg); z-index: 30; }
 .action-icon { color: var(--text-sub); font-size: 1rem; padding: 6px; border-radius: 50%; transition: 0.2s; }
 .action-icon:hover { color: var(--error); background: rgba(255,0,0,0.1); }
 
-/* --- CHECKBOXES (Friend Visibility Fix) --- */
+/* Checkboxes */
 input[type="checkbox"] {
     appearance: none; width: 24px; height: 24px;
     border: 2px solid var(--border); border-radius: 8px;
@@ -146,9 +140,9 @@ input[type="checkbox"]:checked { background: var(--primary); border-color: var(-
 input[type="checkbox"]:checked::after {
     content: '✔'; color: white; font-size: 14px; display: block; text-align: center; line-height: 24px;
 }
-/* Fix for Friend's View (Disabled but Checked) */
+/* Friend View Fix */
 input[type="checkbox"]:disabled { cursor: not-allowed; border-color: var(--border); }
-input[type="checkbox"]:disabled:checked { background: var(--primary); opacity: 0.6; } /* Shows faded pink */
+input[type="checkbox"]:disabled:checked { background: var(--primary); opacity: 0.6; }
 input[type="checkbox"]:disabled:not(:checked) { background: var(--bg-body); opacity: 0.3; }
 
 /* Stats */
@@ -159,15 +153,6 @@ input[type="checkbox"]:disabled:not(:checked) { background: var(--bg-body); opac
 }
 .circle-stat::before { content: ''; width: 27px; height: 27px; background: var(--bg-surface); border-radius: 50%; position: absolute; }
 .circle-stat span { position: relative; z-index: 2; font-size: 0.65rem; font-weight: 700; color: var(--text-sub); }
-
-/* Overlays */
-.loader-overlay {
-    position: fixed; inset: 0; background: var(--bg-surface);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 5000; transition: opacity 0.5s;
-}
-.spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Modal */
 .modal-overlay {
@@ -193,10 +178,6 @@ input[type="checkbox"]:disabled:not(:checked) { background: var(--bg-body); opac
 .input-status { position: absolute; right: 15px; top: 16px; font-size: 1.3rem; }
 .status-ok { color: var(--success); } .status-bad { color: var(--error); }
 
-.empty-state { padding: 60px; text-align: center; color: var(--text-sub); }
-.empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.2; }
-
-/* Login */
 .auth-container {
     width: 90%; max-width: 400px; text-align: center;
     background: var(--bg-surface); padding: 40px; border-radius: 32px;

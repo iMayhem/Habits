@@ -73,7 +73,7 @@
             let email = input;
 
             if (!input.includes('@')) {
-                const { data } = await db.from('profiles').select('email').eq('username', input).single();
+                const { data } = await db.from('profiles').select('email').eq('username', input).maybeSingle();
                 if (!data) {
                     btn.innerText = "Start Tracking";
                     msg.innerText = "Username not found.";

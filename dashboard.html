@@ -121,74 +121,35 @@
             const savedStart = localStorage.getItem('studyStartTime');
             if (savedStart) myStudyStart = parseInt(savedStart);
 
-            // Load Data
+            // Force Username Check First
             await checkUsername();
             await loadFriends();
             await render();
             initRealtime();
 
         } catch (err) {
-            console.error("Error during init:", err);
+            console.error(err);
         } finally {
-            // ALWAYS remove loader
             document.getElementById('appLoader').style.opacity = '0';
             setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
         }
     };
 
-    // --- REALTIME ---
-    function initRealtime() {
-        roomChannel = supabase.channel('habits_global')
-            .on('presence', { event: 'sync' }, () => {
-                const newState = roomChannel.presenceState();
-                onlineUsers = {};
-                for (const id in newState) onlineUsers[id] = newState[id][0];
-                updateOnlineUI();
-            })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') await sendPresence();
-            });
-        setInterval(updateStudyVisuals, 1000);
-    }
-
-    async function sendPresence() {
-        if (!myUsername) return;
-        await roomChannel.track({ user_id: currentUser.id, username: myUsername, is_studying: !!myStudyStart, started_at: myStudyStart });
-    }
-
-    function updateOnlineUI() {
-        const container = document.getElementById('activeStudyingList');
-        if (container) {
-            let html = '';
-            for (const key in onlineUsers) {
-                const u = onlineUsers[key];
-                if (u.is_studying && u.user_id !== currentUser.id) {
-                    html += `<div class="studying-card"><div class="status-dot-user studying"></div><div><span>${u.username}</span><br><span class="studying-time" data-start="${u.started_at}">...</span></div></div>`;
-                }
-            }
-            container.innerHTML = html || '<p style="color:var(--text-sub); font-size:0.9rem;">No friends studying.</p>';
-        }
-    }
-
-    function updateStudyVisuals() {
-        if (myStudyStart) document.getElementById('mainTimer').innerText = formatTime(Math.floor((Date.now() - myStudyStart) / 1000));
-        document.querySelectorAll('.studying-time').forEach(el => {
-            const start = parseInt(el.dataset.start);
-            if(start) el.innerText = formatTime(Math.floor((Date.now() - start)/1000));
-        });
-    }
-
-    // --- LOGIC ---
+    // --- 1. USERNAME LOGIC (FIXED) ---
     async function checkUsername() {
+        // Look for profile
         let { data, error } = await db.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+        
         if (!data) {
-            // Auto-heal missing profile
+            // Fallback: Create profile if trigger missed
             const temp = 'user_' + Math.floor(Math.random() * 99999);
             await db.from('profiles').insert({ id: currentUser.id, email: currentUser.email, username: temp });
             data = { username: temp };
         }
+
         myUsername = data.username;
-        if(myUsername.startsWith('user_')) { 
+        // If it is a temp username, lock screen
+        if (myUsername.startsWith('user_')) { 
             openModal('setup_username');
             document.querySelector('.modal-overlay').style.pointerEvents = 'auto'; 
             document.querySelector('.modal-overlay button.btn-icon').style.display = 'none'; 
@@ -209,6 +170,7 @@
         }, 500);
     }
 
+    // --- 2. RENDER LOGIC ---
     async function render() {
         setSync('saving');
         const year = dateCursor.getFullYear();
@@ -264,10 +226,10 @@
 
         habits.forEach(h => {
             let row = `<tr class="habit-row">
-                <td class="habit-name">
+                <td><div class="habit-name">
                     <span onclick="${isMe ? `openModal('rename_habit', ${h.id}, '${h.title}')` : ''}">${h.title}</span>
                     ${isMe ? `<div class="habit-actions"><i class="ph ph-trash action-icon" onclick="deleteHabit(${h.id})"></i></div>` : ''}
-                </td>`;
+                </div></td>`;
             
             for(let i=1; i<=days; i++) {
                 const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
@@ -280,7 +242,7 @@
     }
 
     function renderFooter(days, year, month, habits, logs) {
-        let html = '<td><div style="padding-left:25px;">Daily %</div></td>';
+        let html = '<td><div style="padding-left:15px; font-weight:600;">Daily %</div></td>';
         for(let i=1; i<=days; i++) {
             const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
@@ -314,144 +276,42 @@
         if(confirm("Delete habit?")) { setSync('saving'); await db.from('habits').delete().eq('id', id); render(); setSync('saved'); }
     }
 
-    function changeMonth(d) { dateCursor.setMonth(dateCursor.getMonth() + d); render(); }
-    
-    function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-sun':'ph-moon', next==='dark'?'ph-sun':'ph-moon');
+    // --- REALTIME & STUDY ---
+    function initRealtime() {
+        roomChannel = supabase.channel('habits_global')
+            .on('presence', { event: 'sync' }, () => {
+                const newState = roomChannel.presenceState();
+                onlineUsers = {};
+                for (const id in newState) onlineUsers[id] = newState[id][0];
+                updateOnlineUI();
+            })
+            .subscribe(async (status) => { if (status === 'SUBSCRIBED') await sendPresence(); });
+        setInterval(updateStudyVisuals, 1000);
     }
-    
-    async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
-
-    // --- MODALS ---
-    let modalState = {}; 
-
-    async function loadFriends() {
-        const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(username)').eq('viewer_id', currentUser.id);
-        const s = document.getElementById('viewSelector');
-        s.innerHTML = '<option value="me">My Habits</option>';
-        if(data) data.forEach(r => {
-            const opt = document.createElement('option');
-            opt.value = r.owner_id; opt.dataset.edit = r.can_edit; opt.innerText = r.profiles.username + "'s Habits";
-            s.appendChild(opt);
+    async function sendPresence() {
+        if (!myUsername) return;
+        await roomChannel.track({ user_id: currentUser.id, username: myUsername, is_studying: !!myStudyStart, started_at: myStudyStart });
+    }
+    function updateOnlineUI() {
+        const container = document.getElementById('activeStudyingList');
+        if (container) {
+            let html = '';
+            for (const key in onlineUsers) {
+                const u = onlineUsers[key];
+                if (u.is_studying && u.user_id !== currentUser.id) {
+                    html += `<div class="studying-card"><div class="status-dot-user studying"></div><div><span>${u.username}</span><br><span class="studying-time" data-start="${u.started_at}">...</span></div></div>`;
+                }
+            }
+            container.innerHTML = html || '<p style="color:var(--text-sub); font-size:0.9rem;">No friends studying.</p>';
+        }
+    }
+    function updateStudyVisuals() {
+        if (myStudyStart) document.getElementById('mainTimer').innerText = formatTime(Math.floor((Date.now() - myStudyStart) / 1000));
+        document.querySelectorAll('.studying-time').forEach(el => {
+            const start = parseInt(el.dataset.start);
+            if(start) el.innerText = formatTime(Math.floor((Date.now() - start)/1000));
         });
     }
-
-    function switchView() {
-        const s = document.getElementById('viewSelector');
-        const dBtn = document.getElementById('desktopAddBtn');
-        const mBtn = document.getElementById('mobileFab');
-        if(s.value === 'me') { 
-            viewingUserId = currentUser.id; canEdit = true; 
-            if(dBtn) dBtn.style.display = 'flex'; if(mBtn) mBtn.style.display = 'flex';
-        } else { 
-            viewingUserId = s.value; canEdit = (s.options[s.selectedIndex].dataset.edit === 'true'); 
-            if(dBtn) dBtn.style.display = 'none'; if(mBtn) mBtn.style.display = 'none';
-        }
-        render();
-    }
-
-    async function openModal(type, id=null, txt='') {
-        modalState = { type, id };
-        const overlay = document.getElementById('modalOverlay');
-        const title = document.getElementById('modalTitle');
-        const body = document.getElementById('modalBody');
-        const btn = document.getElementById('modalActionBtn');
-        
-        overlay.classList.add('open');
-        btn.style.display = 'block'; btn.disabled = false; btn.innerText = "Save";
-
-        if (type === 'study') {
-            title.innerText = "Study Room";
-            btn.style.display = 'none'; 
-            const { data: logs } = await db.from('study_logs').select('duration_minutes').eq('user_id', currentUser.id);
-            const totalHrs = (logs ? logs.reduce((sum, r) => sum + r.duration_minutes, 0) : 0) / 60;
-            const isStudying = !!myStudyStart;
-            
-            body.innerHTML = `
-                <div class="study-container">
-                    <div class="total-time-badge">Total Focus: ${totalHrs.toFixed(1)} hrs</div>
-                    <div id="mainTimer" class="timer-display">${isStudying ? "00:00:00" : "00:00:00"}</div>
-                    <button id="studyToggleBtn" class="study-btn ${isStudying ? 'active' : ''}" onclick="toggleStudy()">
-                        <i class="ph-fill ${isStudying ? 'ph-stop-circle' : 'ph-play-circle'}"></i>
-                        ${isStudying ? "Stop Session" : "Start Session"}
-                    </button>
-                    <div id="activeStudyingList" class="studying-users"></div>
-                </div>`;
-            updateStudyVisuals(); updateOnlineUI();
-        }
-        else if(type === 'habit') {
-            title.innerText = "Add Habit";
-            body.innerHTML = `<input type="text" id="mInput" class="input-field" placeholder="e.g. Drink Water">`;
-            setTimeout(() => document.getElementById('mInput').focus(), 100);
-        }
-        else if (type === 'rename_habit') {
-            title.innerText = "Rename Habit";
-            body.innerHTML = `<input type="text" id="mInput" class="input-field" value="${txt}">`;
-        }
-        else if (type === 'setup_username' || type === 'settings') {
-            title.innerText = type === 'setup_username' ? "Welcome! Pick a Username" : "Settings";
-            body.innerHTML = `
-                <p style="font-size:0.85rem; color:var(--text-sub); margin-bottom:10px;">Unique username for friends to find you.</p>
-                <div class="input-group">
-                    <input type="text" id="mInput" class="input-field" value="${myUsername.startsWith('user_')?'':myUsername}" onkeyup="validateUsername(this.value)">
-                    <i id="uStatus" class="input-status"></i>
-                </div>`;
-            btn.disabled = true; 
-        }
-        else if (type === 'friends') {
-            title.innerText = "Friends";
-            btn.style.display = 'none'; 
-            renderFriendManager(body);
-        }
-        else if (type === 'rename_list') {
-            title.innerText = "List Name";
-            body.innerHTML = `<input type="text" id="mInput" class="input-field" value="${currentListTitle}">`;
-        }
-    }
-
-    async function renderFriendManager(container) {
-        const { data } = await db.from('profile_access').select('id, viewer_id, can_edit, profiles:viewer_id(id, username)').eq('owner_id', currentUser.id);
-        let html = `
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input type="text" id="friendInput" class="input-field" placeholder="Enter Username">
-                <button class="btn-primary" onclick="addFriend()">Add</button>
-            </div>
-            <div style="max-height:200px; overflow-y:auto; border-top:1px solid var(--border); padding-top:10px;">`;
-        
-        if(!data || data.length === 0) html += `<p style="text-align:center; color:var(--text-sub);">No friends added yet.</p>`;
-        else {
-            data.forEach(f => {
-                html += `
-                <div class="friend-list-item">
-                    <div style="display:flex; align-items:center;">
-                        <span class="friend-info">${f.profiles.username}</span>
-                    </div>
-                    <div class="friend-actions">
-                        <button style="font-size:0.7rem; border:1px solid var(--border); background:${f.can_edit?'var(--success)':'var(--bg-surface)'}; color:${f.can_edit?'white':'var(--text-sub)'}; border-radius:4px;" 
-                        onclick="togglePerm(${f.id}, ${!f.can_edit})">${f.can_edit?'Editor':'Viewer'}</button>
-                        <button style="color:var(--error);" onclick="removeFriend(${f.id})"><i class="ph ph-trash"></i></button>
-                    </div>
-                </div>`;
-            });
-        }
-        container.innerHTML = html + `</div>`;
-    }
-
-    async function addFriend() {
-        const val = document.getElementById('friendInput').value;
-        const { data } = await db.from('profiles').select('id').eq('username', val).single();
-        if(!data) return alert("User not found!");
-        await db.from('profile_access').insert({ owner_id: currentUser.id, viewer_id: data.id });
-        renderFriendManager(document.getElementById('modalBody'));
-    }
-    async function togglePerm(id, val) { await db.from('profile_access').update({ can_edit: val }).eq('id', id); renderFriendManager(document.getElementById('modalBody')); }
-    async function removeFriend(id) { await db.from('profile_access').delete().eq('id', id); renderFriendManager(document.getElementById('modalBody')); }
-
-    // --- STUDY LOGIC ---
     async function toggleStudy() {
         const btn = document.getElementById('studyToggleBtn');
         if (!myStudyStart) {
@@ -467,6 +327,85 @@
     }
     function formatTime(s) { return new Date(s * 1000).toISOString().substr(11, 8); }
 
+    // --- UTILS ---
+    function changeMonth(d) { dateCursor.setMonth(dateCursor.getMonth() + d); render(); }
+    function toggleTheme() {
+        const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next); localStorage.setItem('theme', next);
+        document.getElementById('themeIcon').classList.replace(next==='dark'?'ph-sun':'ph-moon', next==='dark'?'ph-sun':'ph-moon');
+    }
+    async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
+
+    // --- MODALS ---
+    let modalState = {}; 
+    async function loadFriends() {
+        const { data } = await db.from('profile_access').select('owner_id, can_edit, profiles:owner_id(username)').eq('viewer_id', currentUser.id);
+        const s = document.getElementById('viewSelector');
+        s.innerHTML = '<option value="me">My Habits</option>';
+        if(data) data.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.owner_id; opt.dataset.edit = r.can_edit; opt.innerText = r.profiles.username + "'s Habits";
+            s.appendChild(opt);
+        });
+    }
+    function switchView() {
+        const s = document.getElementById('viewSelector');
+        const dBtn = document.getElementById('desktopAddBtn');
+        const mBtn = document.getElementById('mobileFab');
+        if(s.value === 'me') { viewingUserId = currentUser.id; canEdit = true; if(dBtn) dBtn.style.display = 'flex'; if(mBtn) mBtn.style.display = 'flex'; }
+        else { viewingUserId = s.value; canEdit = (s.options[s.selectedIndex].dataset.edit === 'true'); if(dBtn) dBtn.style.display = 'none'; if(mBtn) mBtn.style.display = 'none'; }
+        render();
+    }
+    async function openModal(type, id=null, txt='') {
+        modalState = { type, id };
+        const overlay = document.getElementById('modalOverlay');
+        const title = document.getElementById('modalTitle');
+        const body = document.getElementById('modalBody');
+        const btn = document.getElementById('modalActionBtn');
+        
+        overlay.classList.add('open');
+        btn.style.display = 'block'; btn.disabled = false; btn.innerText = "Save";
+
+        if (type === 'study') {
+            title.innerText = "Study Room"; btn.style.display = 'none';
+            const { data: logs } = await db.from('study_logs').select('duration_minutes').eq('user_id', currentUser.id);
+            const totalHrs = (logs ? logs.reduce((sum, r) => sum + r.duration_minutes, 0) : 0) / 60;
+            body.innerHTML = `<div class="study-container"><div class="total-time-badge">Total Focus: ${totalHrs.toFixed(1)} hrs</div><div id="mainTimer" class="timer-display">${!!myStudyStart ? "00:00:00" : "00:00:00"}</div><button id="studyToggleBtn" class="study-btn ${!!myStudyStart ? 'active' : ''}" onclick="toggleStudy()"><i class="ph-fill ${!!myStudyStart ? 'ph-stop-circle' : 'ph-play-circle'}"></i>${!!myStudyStart ? "Stop Session" : "Start Session"}</button><div id="activeStudyingList" class="studying-users"></div></div>`;
+            updateStudyVisuals(); updateOnlineUI();
+        }
+        else if(type === 'habit') { title.innerText = "Add Habit"; body.innerHTML = `<input type="text" id="mInput" class="input-field" placeholder="e.g. Drink Water">`; setTimeout(() => document.getElementById('mInput').focus(), 100); }
+        else if (type === 'rename_habit') { title.innerText = "Rename Habit"; body.innerHTML = `<input type="text" id="mInput" class="input-field" value="${txt}">`; }
+        else if (type === 'setup_username' || type === 'settings') {
+            title.innerText = type === 'setup_username' ? "Welcome! Pick a Username" : "Settings";
+            body.innerHTML = `<p style="font-size:0.85rem; color:var(--text-sub); margin-bottom:10px;">Unique username for friends to find you.</p><div class="input-group"><input type="text" id="mInput" class="input-field" value="${myUsername.startsWith('user_')?'':myUsername}" onkeyup="validateUsername(this.value)"><i id="uStatus" class="input-status"></i></div>`;
+            btn.disabled = true; 
+        }
+        else if (type === 'friends') { title.innerText = "Friends"; btn.style.display = 'none'; renderFriendManager(body); }
+        else if (type === 'rename_list') { title.innerText = "List Name"; body.innerHTML = `<input type="text" id="mInput" class="input-field" value="${currentListTitle}">`; }
+    }
+
+    async function renderFriendManager(container) {
+        const { data } = await db.from('profile_access').select('id, viewer_id, can_edit, profiles:viewer_id(id, username)').eq('owner_id', currentUser.id);
+        let html = `<div style="display:flex; gap:10px; margin-bottom:15px;"><input type="text" id="friendInput" class="input-field" placeholder="Enter Username"><button class="btn-primary" onclick="addFriend()">Add</button></div><div style="max-height:200px; overflow-y:auto; border-top:1px solid var(--border); padding-top:10px;">`;
+        if(!data || data.length === 0) html += `<p style="text-align:center; color:var(--text-sub);">No friends added yet.</p>`;
+        else {
+            data.forEach(f => {
+                const uid = f.profiles.id; const isOnline = onlineUsers[uid]; const dotClass = isOnline ? (isOnline.is_studying ? 'studying' : 'online') : '';
+                html += `<div class="friend-list-item"><div style="display:flex; align-items:center;"><div class="status-dot-user ${dotClass}" data-uid="${uid}"></div><span class="friend-info">${f.profiles.username}</span></div><div class="friend-actions"><button style="font-size:0.7rem; border:1px solid var(--border); background:${f.can_edit?'var(--success)':'var(--bg-surface)'}; color:${f.can_edit?'white':'var(--text-sub)'}; border-radius:4px;" onclick="togglePerm(${f.id}, ${!f.can_edit})">${f.can_edit?'Editor':'Viewer'}</button><button style="color:var(--error);" onclick="removeFriend(${f.id})"><i class="ph ph-trash"></i></button></div></div>`;
+            });
+        }
+        container.innerHTML = html + `</div>`;
+    }
+    async function addFriend() {
+        const val = document.getElementById('friendInput').value;
+        const { data } = await db.from('profiles').select('id').eq('username', val).single();
+        if(!data) return alert("User not found!");
+        await db.from('profile_access').insert({ owner_id: currentUser.id, viewer_id: data.id });
+        renderFriendManager(document.getElementById('modalBody'));
+    }
+    async function togglePerm(id, val) { await db.from('profile_access').update({ can_edit: val }).eq('id', id); renderFriendManager(document.getElementById('modalBody')); }
+    async function removeFriend(id) { await db.from('profile_access').delete().eq('id', id); renderFriendManager(document.getElementById('modalBody')); }
+
     function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 
     document.getElementById('modalActionBtn').onclick = async () => {
@@ -480,13 +419,11 @@
             else if (modalState.type === 'setup_username' || modalState.type === 'settings') {
                 const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
                 if(!error) { 
-                    myUsername = val;
-                    // NO RELOAD - Just close modal
-                    closeModal();
-                    document.getElementById('modalOverlay').style.pointerEvents = '';
+                    myUsername = val; 
+                    closeModal(); // Just close, no reload
+                    document.querySelector('.modal-overlay').style.pointerEvents = ''; // Unlock
                     document.querySelector('.modal-overlay button.btn-icon').style.display = 'block';
-                    setSync('saved');
-                    return;
+                    setSync('saved'); return; 
                 }
             }
             closeModal(); render();
