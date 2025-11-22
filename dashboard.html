@@ -11,10 +11,12 @@
 </head>
 <body>
 
+<!-- Loader -->
 <div id="appLoader" class="loader-overlay">
     <div class="spinner"></div>
 </div>
 
+<!-- Sync Status -->
 <div id="syncStatus" class="sync-status">
     <div id="syncDot" class="sync-dot"></div><span id="syncText">Saved</span>
 </div>
@@ -40,7 +42,7 @@
                 <i class="ph ph-users"></i>
             </button>
             
-            <!-- Study Room Button -->
+            <!-- Study Room -->
             <button class="btn-icon" onclick="openModal('study')" title="Study Room">
                 <i class="ph ph-clock"></i>
             </button>
@@ -106,30 +108,41 @@
     let currentListTitle = "HABITS";
     let myUsername = "";
     
-    // Realtime & Study
+    // Realtime
     let roomChannel, myStudyStart = null, onlineUsers = {};
 
     window.onload = async () => {
-        const theme = localStorage.getItem('theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme);
-        document.getElementById('themeIcon').classList.replace(theme === 'dark' ? 'ph-moon' : 'ph-sun', theme === 'dark' ? 'ph-sun' : 'ph-moon');
+        try {
+            // 1. Init Theme
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('themeIcon').classList.replace(theme === 'dark' ? 'ph-moon' : 'ph-sun', theme === 'dark' ? 'ph-sun' : 'ph-moon');
 
-        const { data: { session } } = await db.auth.getSession();
-        if (!session) { window.location.href = 'index.html'; return; }
-        
-        currentUser = session.user;
-        viewingUserId = currentUser.id;
+            // 2. Check Auth
+            const { data: { session } } = await db.auth.getSession();
+            if (!session) { window.location.href = 'index.html'; return; }
+            
+            currentUser = session.user;
+            viewingUserId = currentUser.id;
 
-        const savedStart = localStorage.getItem('studyStartTime');
-        if (savedStart) myStudyStart = parseInt(savedStart);
+            // 3. Init Study Time
+            const savedStart = localStorage.getItem('studyStartTime');
+            if (savedStart) myStudyStart = parseInt(savedStart);
 
-        await checkUsername();
-        await loadFriends();
-        await render();
-        initRealtime();
+            // 4. Critical Loads
+            await checkUsername();
+            await loadFriends();
+            await render();
+            initRealtime();
 
-        document.getElementById('appLoader').style.opacity = '0';
-        setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
+        } catch (err) {
+            console.error("Init Error:", err);
+            alert("Something went wrong loading data. Please refresh.");
+        } finally {
+            // 5. SAFETY NET: Always hide loader
+            document.getElementById('appLoader').style.opacity = '0';
+            setTimeout(() => document.getElementById('appLoader').style.display = 'none', 500);
+        }
     };
 
     // --- REALTIME ---
@@ -149,20 +162,14 @@
 
     async function sendPresence() {
         if (!myUsername) return;
-        await roomChannel.track({
-            user_id: currentUser.id,
-            username: myUsername,
-            is_studying: !!myStudyStart,
-            started_at: myStudyStart
-        });
+        await roomChannel.track({ user_id: currentUser.id, username: myUsername, is_studying: !!myStudyStart, started_at: myStudyStart });
     }
 
     function updateOnlineUI() {
         document.querySelectorAll('.status-dot-user').forEach(el => {
             const uid = el.dataset.uid;
-            if (onlineUsers[uid]) {
-                el.className = `status-dot-user ${onlineUsers[uid].is_studying ? 'studying' : 'online'}`;
-            } else el.className = 'status-dot-user';
+            if (onlineUsers[uid]) el.className = `status-dot-user ${onlineUsers[uid].is_studying ? 'studying' : 'online'}`;
+            else el.className = 'status-dot-user';
         });
         
         const container = document.getElementById('activeStudyingList');
@@ -188,14 +195,21 @@
 
     // --- CORE LOGIC ---
     async function checkUsername() {
-        const { data } = await db.from('profiles').select('username').eq('id', currentUser.id).single();
-        if(data) {
-            myUsername = data.username;
-            if(myUsername.startsWith('user_')) { 
-                openModal('setup_username');
-                document.querySelector('.modal-overlay').style.pointerEvents = 'auto'; 
-                document.querySelector('.modal-overlay button.btn-icon').style.display = 'none'; 
-            }
+        // Check profile exists, if not create temp one (Fallback fix)
+        let { data, error } = await db.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+        
+        if (!data) {
+            // Force create profile if missing
+            const tempName = 'user_' + Math.floor(Math.random() * 10000);
+            await db.from('profiles').insert({ id: currentUser.id, email: currentUser.email, username: tempName });
+            data = { username: tempName };
+        }
+
+        myUsername = data.username;
+        if(myUsername.startsWith('user_')) { 
+            openModal('setup_username');
+            document.querySelector('.modal-overlay').style.pointerEvents = 'auto'; 
+            document.querySelector('.modal-overlay button.btn-icon').style.display = 'none'; 
         }
     }
 
@@ -285,7 +299,7 @@
     }
 
     function renderFooter(days, year, month, habits, logs) {
-        let html = '<td>Daily %</td>';
+        let html = '<td><div style="padding-left:25px;">Daily %</div></td>';
         for(let i=1; i<=days; i++) {
             const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             let total = habits.length;
@@ -331,7 +345,7 @@
     
     async function logout() { await db.auth.signOut(); window.location.href = 'index.html'; }
 
-    // --- MODALS ---
+    // --- FRIENDS & MODALS ---
     let modalState = {}; 
 
     async function loadFriends() {
@@ -487,7 +501,11 @@
         else if (modalState.type === 'rename_list') await db.from('profiles').update({ list_title: val }).eq('id', currentUser.id);
         else if (modalState.type === 'setup_username' || modalState.type === 'settings') {
             const { error } = await db.from('profiles').update({ username: val }).eq('id', currentUser.id);
-            if(!error) { myUsername = val; window.location.reload(); return; }
+            if(!error) { 
+                myUsername = val; 
+                window.location.reload(); 
+                return; 
+            }
         }
         setSync('saved'); closeModal(); render();
     };
